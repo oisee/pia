@@ -2,8 +2,20 @@ CLASS zcl_pia_00_json_util DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
     CLASS-METHODS escape
-      IMPORTING iv_         TYPE string
-      RETURNING VALUE(rv_)  TYPE string.
+      IMPORTING iv_        TYPE string
+      RETURNING VALUE(rv_) TYPE string.
+
+    CLASS-METHODS to_int
+      IMPORTING iv_        TYPE string
+      RETURNING VALUE(rv_) TYPE i.
+
+    CLASS-METHODS to_hex4
+      IMPORTING iv_        TYPE i
+      RETURNING VALUE(rv_) TYPE string.
+
+    CLASS-METHODS hexval
+      IMPORTING iv_        TYPE string
+      RETURNING VALUE(rv_) TYPE i.
 
     CLASS-METHODS extract_str
       IMPORTING iv_json     TYPE string
@@ -26,12 +38,67 @@ ENDCLASS.
 CLASS zcl_pia_00_json_util IMPLEMENTATION.
 
   METHOD escape.
-    rv_ = iv_.
-    REPLACE ALL OCCURRENCES OF `\` IN rv_ WITH `\\`.
-    REPLACE ALL OCCURRENCES OF `"` IN rv_ WITH `\"`.
-    REPLACE ALL OCCURRENCES OF |\n| IN rv_ WITH `\n`.
-    REPLACE ALL OCCURRENCES OF |\r| IN rv_ WITH `\r`.
-    REPLACE ALL OCCURRENCES OF |\t| IN rv_ WITH `\t`.
+    DATA lv_i TYPE i.
+    DATA lv_len TYPE i.
+    DATA lv_ch TYPE string.
+    lv_len = strlen( iv_ ).
+    WHILE lv_i < lv_len.
+      lv_ch = iv_+lv_i(1).
+      CASE lv_ch.
+        WHEN `\`. rv_ = rv_ && `\\`.
+        WHEN `"`. rv_ = rv_ && `\"`.
+        WHEN OTHERS.
+          IF lv_ch = |\n|.
+            rv_ = rv_ && `\n`.
+          ELSEIF lv_ch = |\r|.
+            rv_ = rv_ && `\r`.
+          ELSEIF lv_ch = |\t|.
+            rv_ = rv_ && `\t`.
+          ELSEIF strlen( cl_abap_codepage=>convert_to( lv_ch ) ) <= 2.
+            rv_ = rv_ && lv_ch. " ASCII fast path
+          ELSE.
+            " non-ASCII -> \uXXXX (UTF-8 bytes -> codepoint)
+            DATA(lv_hex) = to_upper( cl_abap_codepage=>convert_to( lv_ch ) ).
+            DATA(lv_n) = strlen( lv_hex ) / 2.
+            DATA lv_cp TYPE i.
+            IF lv_n = 2.
+              lv_cp = ( to_int( substring( val = lv_hex off = 0 len = 2 ) ) - 192 ) * 64 + ( to_int( substring( val = lv_hex off = 2 len = 2 ) ) - 128 ).
+            ELSEIF lv_n = 3.
+              lv_cp = ( to_int( substring( val = lv_hex off = 0 len = 2 ) ) - 224 ) * 4096
+                    + ( to_int( substring( val = lv_hex off = 2 len = 2 ) ) - 128 ) * 64
+                    + ( to_int( substring( val = lv_hex off = 4 len = 2 ) ) - 128 ).
+            ELSE.
+              lv_cp = 63. " fallback '?'
+            ENDIF.
+            rv_ = rv_ && `\u` && to_hex4( lv_cp ).
+          ENDIF.
+      ENDCASE.
+      lv_i = lv_i + 1.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD to_int.
+    " hex pair -> int
+    rv_ = hexval( substring( val = iv_ off = 0 len = 1 ) ) * 16
+          + hexval( substring( val = iv_ off = 1 len = 1 ) ).
+  ENDMETHOD.
+
+  METHOD to_hex4.
+    DATA lv TYPE string.
+    lv = iv_.
+    " 4-digit uppercase hex
+    DATA(lv_h) = to_upper( |{ iv_ }| ).
+    DATA(lv_pad) = '0000' && lv_h.
+    rv_ = substring( val = lv_pad off = strlen( lv_pad ) - 4 len = 4 ).
+  ENDMETHOD.
+
+  METHOD hexval.
+    CASE to_upper( substring( val = iv_ off = 0 len = 1 ) ).
+      WHEN '0'. rv_ = 0. WHEN '1'. rv_ = 1. WHEN '2'. rv_ = 2. WHEN '3'. rv_ = 3.
+      WHEN '4'. rv_ = 4. WHEN '5'. rv_ = 5. WHEN '6'. rv_ = 6. WHEN '7'. rv_ = 7.
+      WHEN '8'. rv_ = 8. WHEN '9'. rv_ = 9. WHEN 'A'. rv_ = 10. WHEN 'B'. rv_ = 11.
+      WHEN 'C'. rv_ = 12. WHEN 'D'. rv_ = 13. WHEN 'E'. rv_ = 14. WHEN 'F'. rv_ = 15.
+    ENDCASE.
   ENDMETHOD.
 
   METHOD extract_str.
