@@ -73,7 +73,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     APPEND '.u{border-color:#1f6feb}.a{border-color:#238636}.t{border-color:#30363d;color:#8b949e;font-size:12px}' TO lv.
     APPEND 'form{display:flex;gap:8px;margin-top:16px}textarea{flex:1;min-height:52px;resize:vertical;font-family:inherit;font-size:14px;background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:10px}' TO lv.
     APPEND 'button{background:#238636;color:#fff;border:0;border-radius:6px;padding:10px 18px;cursor:pointer}.it{color:#8b949e;font-size:11px}</style></head><body>' TO lv.
-    APPEND '<h1>&#128053; PIA PIA &mdash; pi, пишущий себя на ABAPmdash; pi, writing itself in ABAP</h1>' TO lv.
+    APPEND '<h1>&#128053; PIA &mdash; pi, writing itself in ABAP</h1>' TO lv.
     LOOP AT mo_session->get_messages( ) INTO DATA(ls).
       IF ls-role = 'system'. CONTINUE. ENDIF.
       DATA(lv_cls) = 't'.
@@ -97,7 +97,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
         APPEND '<div class="msg t">' && lv_ev && '</div>' TO lv.
       ENDIF.
     ENDLOOP.
-    APPEND `<form method="post" onsubmit="document.getElementById('sb').disabled=true"><textarea name="msg" id="msg" rows="2" placeholder="task or question... (Enter=send, Shift+Enter=newline)" autofocus></textarea><button id="sb" type="submit">Send</button></form>` TO lv.
+    APPEND `<form method="post" onsubmit="document.getElementById('think').style.display='block';this.style.display='none'"><textarea name="msg" id="msg" rows="2" placeholder="task or question... (Enter=send, Shift+Enter=newline)" autofocus></textarea><button id="sb" type="submit">Send</button></form>` TO lv.
     APPEND `<script>const ta=document.getElementById('msg');ta.addEventListener('keydown',e=>{if((e.key==='Enter')&&!e.shiftKey){e.preventDefault();ta.form.submit();}});</script>` TO lv.
     APPEND |<p class="it">iters={ mo_session->mv_iterations } tools={ mo_session->mv_tool_calls } &middot; glm-5.3-flash &middot; OSG :8020</p>| TO lv.
     APPEND '</body></html>' TO lv.

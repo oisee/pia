@@ -13,7 +13,7 @@ except: print('?')" 2>/dev/null)
     H=$(echo "$CMD" | md5sum | cut -c1-8)
     LAST=$(grep "$H ok" $STATE 2>/dev/null | tail -1)
     if [ -z "$LAST" ]; then
-      if echo "$CMD" | grep -qE '^(gh (api|run|pr|issue) |git (status|log|diff|show|branch|tag --list|rev-parse) |cat |head |tail |grep |ls |find |sed -n |wc |python3 - <<|PATH=[^ ]* OSD_HEAVY_RANGE=; then
+      if echo "$CMD" | grep -qE '^(gh (api|run|pr|issue) |git (status|log|diff|show|branch|tag --list|rev-parse) |cat |head |tail |grep |ls |find |ps |sed -n |wc |python3 - <<|PATH=[^ ]* OSD_HEAVY_RANGE=; then
         ~/.local/bin/herdr pane send-keys w3:p1 Enter >/dev/null 2>&1
         echo "$(date '+%T') AUTO-OK [$H] $CMD" >> $LOG; echo "$H ok" >> $STATE
       else

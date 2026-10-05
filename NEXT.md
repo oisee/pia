@@ -1,5 +1,5 @@
 # Следующий шаг PIA
-1. P2a-ПРИЁМКА на http://127.0.0.1:8091 (сервер коллеги стабилен, GO дан):
+1. ЧАТ-UX: H1 только EN + индикатор 'думает...' при отправке; затем TUI/terminal via APC + стриминг (порт $ZLLM_05)
    a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
    b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
    c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE
