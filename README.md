@@ -4,8 +4,6 @@
 
 > ABAP becomes the implementation language of the coding agent itself.
 
-[![chat](screenshots/chat.png)](#screenshots)
-
 ## What it is
 
 ```
@@ -32,9 +30,7 @@ The same agent loop that talks to the LLM also **reads, writes, activates and ve
 
 ## Screenshots
 
-| terminal multi-turn | HTML chat | APC workbench |
-|---|---|---|
-| ![](screenshots/chat.png) | ![](screenshots/chat-html.png) | ![](screenshots/workbench.png) |
+Coming with the chat UI (`$ZPIA_30`): terminal multi-turn, HTML chat, APC workbench — files will land in `screenshots/`.
 
 ## Layout
 
