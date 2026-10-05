@@ -16,3 +16,6 @@
 - H1 только EN: "PIA — pi, writing itself in ABAP" (рус. убрать из заголовка)
 - SEND: индикатор "думает..." сразу при отправке (кнопка disabled + статус) — сейчас выглядит сломанным
 - TUI/terminal via APC + стриминг ответов — следующий фронт ($ZLLM_05 порт)
+
+## ✅ P2a ПРИНЯТА (2026-10-06): CREATE→RED→green→GREEN→DELETE→404 на :8091
+STORE CREATE/DELETE из ABAP работают по контракту; после рестарта 8091 с JSON CHECK/ACTIVATE — включится ветка моего адаптера (active/issues из EV_JSON).
