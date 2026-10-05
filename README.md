@@ -30,7 +30,9 @@ The same agent loop that talks to the LLM also **reads, writes, activates and ve
 
 ## Screenshots
 
-Coming with the chat UI (`$ZPIA_30`): terminal multi-turn, HTML chat, APC workbench — files will land in `screenshots/`.
+![PIA chat](screenshots/chat.png)
+
+Live chat at `/sap/bc/zpia_chat/` (ICF + `zcl_pia_30_f_chat`): task in, tool calls and results streamed into the transcript, answer out — same session, multi-turn, glm-5.3-flash.
 
 ## Layout
 

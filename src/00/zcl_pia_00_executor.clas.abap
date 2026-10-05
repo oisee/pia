@@ -19,6 +19,7 @@ CLASS zcl_pia_00_executor DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_task           TYPE string
                 iv_system         TYPE string
                 iv_max_iterations TYPE i DEFAULT 8
+                iv_continue       TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(rs_)        TYPE ts_result.
 
   PRIVATE SECTION.
@@ -38,8 +39,10 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run.
-    mo_session->push_message( iv_role = 'system' iv_content = iv_system ).
-    mo_session->push_message( iv_role = 'user'   iv_content = iv_task ).
+    IF iv_continue = abap_false.
+      mo_session->push_message( iv_role = 'system' iv_content = iv_system ).
+    ENDIF.
+    mo_session->push_message( iv_role = 'user' iv_content = iv_task ).
     mo_session->evt( 'session_start' ).
 
     WHILE mo_session->mv_iterations < iv_max_iterations.
