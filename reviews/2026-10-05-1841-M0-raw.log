@@ -1,0 +1,1 @@
+Error loading config.toml: --profile `azure` cannot be used while /home/alice/.codex/config.toml contains legacy `profile = "azure"` or `[profiles.azure]` config; move those settings into /home/alice/.codex/azure.config.toml and remove the legacy profile selector/table. See https://developers.openai.com/codex/config-advanced#profiles for more information.

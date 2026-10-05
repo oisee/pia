@@ -1,0 +1,109 @@
+CLASS zcl_pia_00_executor DEFINITION PUBLIC FINAL CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    TYPES: BEGIN OF ts_result,
+             answer     TYPE string,
+             iterations TYPE i,
+             tool_calls TYPE i,
+             ok         TYPE abap_bool,
+             error      TYPE string,
+           END OF ts_result.
+
+    CLASS-METHODS new
+      IMPORTING io_llm      TYPE REF TO zif_pia_00_llm
+                io_registry TYPE REF TO zcl_pia_00_registry
+                io_session  TYPE REF TO zcl_pia_00_session
+      RETURNING VALUE(ro_)  TYPE REF TO zcl_pia_00_executor.
+
+    METHODS run
+      IMPORTING iv_task           TYPE string
+                iv_system         TYPE string
+                iv_max_iterations TYPE i DEFAULT 8
+      RETURNING VALUE(rs_)        TYPE ts_result.
+
+  PRIVATE SECTION.
+    DATA mo_llm      TYPE REF TO zif_pia_00_llm.
+    DATA mo_registry TYPE REF TO zcl_pia_00_registry.
+    DATA mo_session  TYPE REF TO zcl_pia_00_session.
+
+ENDCLASS.
+
+CLASS zcl_pia_00_executor IMPLEMENTATION.
+
+  METHOD new.
+    ro_ = NEW #( ).
+    ro_->mo_llm = io_llm.
+    ro_->mo_registry = io_registry.
+    ro_->mo_session = io_session.
+  ENDMETHOD.
+
+  METHOD run.
+    mo_session->push_message( iv_role = 'system' iv_content = iv_system ).
+    mo_session->push_message( iv_role = 'user'   iv_content = iv_task ).
+    mo_session->evt( 'session_start' ).
+
+    WHILE mo_session->mv_iterations < iv_max_iterations.
+      mo_session->inc_iteration( ).
+
+      mo_llm->chat(
+        EXPORTING
+          it_messages   = mo_session->get_messages( )
+          iv_tools_json = mo_registry->get_tools_json_openai( )
+        IMPORTING
+          et_calls          = DATA(lt_calls)
+          ev_answer         = DATA(lv_answer)
+          ev_assistant_raw  = DATA(lv_raw)
+          ev_status         = DATA(lv_status)
+          ev_error          = DATA(lv_error) ).
+
+      IF lv_error IS NOT INITIAL.
+        rs_-ok = abap_false.
+        rs_-error = lv_error.
+        mo_session->evt( |llm_error { lv_error }| ).
+        RETURN.
+      ENDIF.
+
+      IF lt_calls IS INITIAL.
+        rs_-answer = lv_answer.
+        rs_-ok = abap_true.
+        rs_-iterations = mo_session->mv_iterations.
+        rs_-tool_calls = mo_session->mv_tool_calls.
+        mo_session->push_message( iv_role = 'assistant' iv_content = lv_answer ).
+        mo_session->evt( 'turn_complete' ).
+        RETURN.
+      ENDIF.
+
+      mo_session->push_message( iv_role = 'assistant' iv_content = lv_raw ).
+
+      LOOP AT lt_calls INTO DATA(ls_call).
+        mo_session->inc_tool_call( ).
+        mo_session->evt( |tool_started { ls_call-name }| ).
+
+        DATA(ls_result) = mo_registry->invoke_call( ls_call ).
+
+        mo_session->log_tool(
+          iv_tool = ls_call-name iv_args = ls_call-arguments
+          iv_ok = ls_result-ok iv_output = ls_result-output ).
+
+        DATA lv_out TYPE string.
+        lv_out = ls_result-output.
+        IF strlen( lv_out ) > 8000.
+          lv_out = lv_out+0(8000) && '...[truncated]'.
+        ENDIF.
+
+        mo_session->push_message(
+          iv_role = 'tool'
+          iv_content = '"tool_call_id":"' && ls_call-id &&
+                       '","content":"' && zcl_pia_00_json_util=>escape( lv_out ) && '"' ).
+
+        mo_session->evt( |tool_finished { ls_call-name } ok={ ls_result-ok }| ).
+      ENDLOOP.
+    ENDWHILE.
+
+    rs_-ok = abap_true.
+    rs_-answer = 'MAX ITERATIONS REACHED'.
+    rs_-iterations = mo_session->mv_iterations.
+    rs_-tool_calls = mo_session->mv_tool_calls.
+  ENDMETHOD.
+
+ENDCLASS.
