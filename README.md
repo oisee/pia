@@ -1,9 +1,12 @@
 # PIA — Pi-ABAP Agent
 
-**A coding agent written in ABAP, running inside SAP, that writes, activates and tests ABAP.**
+**pi, writing itself in ABAP.** A coding agent written in ABAP, running inside SAP, that writes, activates and
+tests ABAP — including its own code.
 
 You type a task into a terminal in your browser. PIA reads the class, writes the fix, activates it and runs
-its ABAP Unit tests — on the same system it runs in, through ADT, as you.
+its ABAP Unit tests — on the same system it runs in, through ADT, as you. ABAP is not only what PIA edits but
+what PIA is made of: the agent loop, the LLM client, the tools and the terminal are ABAP classes in the same
+system, so PIA can read, change and re-activate itself (self-hosting, `reports/2026-10-06-SELF-HOSTING.md`).
 
 ![PIA on SAP A4H: tests go red after a change, PIA fixes it, tests go green](screenshots/a4h-tui/en-3-red.png)
 
@@ -79,6 +82,13 @@ warm publishing in ~2.6 s. In 0.1 this needs the development-API branch of open-
 
 `ZCL_PIA_20_BACKEND=>DEFAULT( )` picks the backend: the STORE backend on open-steamgate, ADT on SAP.
 Porting notes from the first SAP install are in `osg-probe/a4h/README.md`.
+
+## Writing itself
+
+PIA's first self-hosting run (October 2026, on open-steamgate): asked to extend its own JSON helper, PIA read
+`ZCL_PIA_00_JSON_UTIL`, added a method, activated it, and the next turn ran on the new code. Its own unit tests
+were drafted by a second agent, checked by a critic, and run through the same `run_tests` tool (30/30 on SAP).
+Fixing a real bug in itself without a human prompt per step is the goal after 0.1 (see the backlog).
 
 ## Known limits in 0.1
 
