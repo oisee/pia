@@ -6,7 +6,7 @@ ENDCLASS.
 CLASS zcl_pia_90_mock_run IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
     out->write( `PIA M1: mock loop` ).
-    DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
+    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     DATA(lo_registry) = zcl_pia_00_registry=>new( ).
     DATA(lo_read) = NEW zcl_pia_10_t_read_object( ).
     lo_read->set_backend( lo_backend ).

@@ -31,6 +31,7 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     DATA mo_session TYPE REF TO zcl_pia_00_session.   " one conversation per connection
     CLASS-DATA go_registry TYPE REF TO zcl_pia_00_registry.
     CLASS-DATA go_llm      TYPE REF TO zif_pia_00_llm.
+    CLASS-DATA gv_backend  TYPE string.
 
     METHODS send IMPORTING iv_text TYPE string.
     METHODS boot.
@@ -76,7 +77,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
 
     boot( ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
-    send( |{ gv_dim }Tools: read/write/activate/run_tests · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
+    send( |{ gv_dim }Tools: read/write/activate/run_tests · backend { gv_backend } · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }Type a task and press Enter{ gv_reset }{ c_crlf }{ c_crlf }| ).
   ENDMETHOD.
 
@@ -119,7 +120,8 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
       mo_session = zcl_pia_00_session=>new( 'tui' ).
     ENDIF.
     IF go_registry IS BOUND. RETURN. ENDIF.
-    DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
+    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
+    gv_backend = lo_backend->get_name( ).
     go_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(

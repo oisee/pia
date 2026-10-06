@@ -15,7 +15,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
 
   METHOD boot.
     IF mo_session IS BOUND. RETURN. ENDIF.
-    DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
+    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     mo_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = mo_registry io_backend = lo_backend ).
     mo_llm = zcl_pia_00_llm_http=>new( VALUE #(

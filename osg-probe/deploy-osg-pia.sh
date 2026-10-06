@@ -7,7 +7,7 @@ OSG=${OSG:-~/dev/osg-pia}
 DST=$OSG/local/tmp
 mkdir -p "$DST"
 cp ~/dev/osg-adt-abap/local/tmp/package.devc.xml "$DST/" 2>/dev/null || true
-find "$SRC" -type f \( -name '*.abap' -o -name '*.xml' \) ! -name package.devc.xml -exec cp {} "$DST/" \;
+find "$SRC" -type f \( -name '*.abap' -o -name '*.xml' \) ! -name package.devc.xml ! -name 'zcl_pia_20_b_adt.*' -exec cp {} "$DST/" \;  # SAP-only backend stays out of OSG
 # tadir.json: one entry per class/interface
 python3 - "$DST" <<'PY'
 import json, os, sys

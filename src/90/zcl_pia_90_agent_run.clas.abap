@@ -7,7 +7,7 @@ CLASS zcl_pia_90_agent_run IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
     out->write( `PIA M1: live agent run` ).
 
-    DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
+    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     DATA(lo_registry) = zcl_pia_00_registry=>new( ).
 
     zcl_pia_15_toolset=>register_dev_tools( io_registry = lo_registry io_backend = lo_backend ).

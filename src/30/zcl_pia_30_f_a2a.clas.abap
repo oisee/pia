@@ -19,7 +19,7 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
 
   METHOD boot.
     IF go_session IS BOUND. RETURN. ENDIF.
-    DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
+    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     go_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(
