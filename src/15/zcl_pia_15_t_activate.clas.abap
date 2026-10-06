@@ -33,17 +33,27 @@ CLASS zcl_pia_15_t_activate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~invoke.
-    DATA(lv_name) = get_arg( iv_name = 'name' iv_arguments = iv_arguments ).
+    DATA lv_name TYPE string.
+    lv_name = get_arg( iv_name = 'name' iv_arguments = iv_arguments ).
     IF lv_name IS INITIAL.
       rs_ = fail( 'name is required' ).
       RETURN.
     ENDIF.
-    DATA(ls) = mo_backend->activate( lv_name ).
-    IF ls-ok = abap_false.
-      rs_ = fail( ls-message ).
+    DATA(ls_act) = mo_backend->activate( lv_name ).
+    IF ls_act-ok = abap_false.
+      rs_ = fail( 'activation refused: ' && ls_act-issues ).
       RETURN.
     ENDIF.
-    rs_ = ok( ls-message ).
+    " Include op_id for checkpoint/resume tracking
+    DATA lv_out TYPE string.
+    lv_out = 'activated: ' && lv_name.
+    IF ls_act-op_id IS NOT INITIAL.
+      lv_out = lv_out && ' op_id=' && ls_act-op_id.
+    ENDIF.
+    IF ls_act-state = 'pending'.
+      lv_out = lv_out && ' (publish pending — new code live in next step)'.
+    ENDIF.
+    rs_ = ok( lv_out ).
   ENDMETHOD.
 
   METHOD set_backend.
