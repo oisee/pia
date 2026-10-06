@@ -123,19 +123,18 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
           WHEN `r`. rv_ = rv_ && |\r|.
           WHEN `t`. rv_ = rv_ && |\t|.
           WHEN `u`.
-            " \uXXXX (common codepoints; the rest kept verbatim)
+            " \uXXXX -> character (was: only 5 ASCII codepoints, Cyrillic stayed escaped)
             DATA lv_hex TYPE string.
+            DATA lv_char TYPE string.
             IF lv_j + 4 < lv_len.
               lv_hex = iv_+lv_j(5).
               lv_hex = lv_hex+1(4).
-              CASE to_lower( lv_hex ).
-                WHEN `003e`. rv_ = rv_ && `>`.
-                WHEN `003c`. rv_ = rv_ && `<`.
-                WHEN `0026`. rv_ = rv_ && `&`.
-                WHEN `0027`. rv_ = rv_ && `'`.
-                WHEN `0022`. rv_ = rv_ && `"`.
-                WHEN OTHERS. rv_ = rv_ && `\u` && lv_hex.
-              ENDCASE.
+              TRY.
+                  lv_char = cl_abap_conv_in_ce=>uccp( to_upper( lv_hex ) ).
+                  rv_ = rv_ && lv_char.
+                CATCH cx_root.
+                  rv_ = rv_ && `\u` && lv_hex.
+              ENDTRY.
               lv_i = lv_i + 4.
             ENDIF.
           WHEN OTHERS. rv_ = rv_ && iv_+lv_j(1).
