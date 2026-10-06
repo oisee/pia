@@ -3,8 +3,14 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
   INHERITING FROM cl_apc_wsp_ext_stateful_base
   CREATE PUBLIC.
 
+  " Terminal push channel. The browser keeps a session id (?sid=...) so a conversation
+  " survives reconnects; the turn itself runs in zcl_pia_30_turn, and everything it says
+  " arrives over AMC (channel extension = sid). PIA_TURN_MODE in pia.env picks where the
+  " turn runs: inline (in this handler; OSG only), job (background job) or daemon.
+  " Default: job on SAP, inline elsewhere. On SAP the handler itself may not run ABAP Unit
+  " or write sources ("Invalid statement in ABAP push channel").
+
   PUBLIC SECTION.
-    INTERFACES zif_pia_00_listener.
     METHODS if_apc_wsp_extension~on_accept REDEFINITION.
     METHODS if_apc_wsp_extension~on_start REDEFINITION.
     METHODS if_apc_wsp_extension~on_message REDEFINITION.
@@ -24,18 +30,14 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     CLASS-DATA gv_done  TYPE string.  " OSC marker: turn finished (stops the client status line)
 
     DATA mo_msg_mgr TYPE REF TO if_apc_wsp_message_manager.
-    DATA mv_running TYPE abap_bool.
-    DATA mv_started TYPE abap_bool.
-    DATA mv_bound   TYPE abap_bool.   " AMC consumer bound: tool events arrive live
-
-    DATA mo_session TYPE REF TO zcl_pia_00_session.   " one conversation per connection
-    CLASS-DATA go_registry TYPE REF TO zcl_pia_00_registry.
-    CLASS-DATA go_llm      TYPE REF TO zif_pia_00_llm.
-    CLASS-DATA gv_backend  TYPE string.
+    DATA mv_bound   TYPE abap_bool.   " AMC consumer bound: the turn's output arrives
+    DATA mv_sid     TYPE string.
+    DATA mv_mode    TYPE string.
+    DATA mv_backend TYPE string.
 
     METHODS send IMPORTING iv_text TYPE string.
-    METHODS boot.
-    METHODS run_task IMPORTING iv_task TYPE string.
+    METHODS read_sid IMPORTING io_context TYPE REF TO if_apc_wsp_server_context.
+    METHODS start_turn IMPORTING iv_task TYPE string.
 
 ENDCLASS.
 
@@ -59,25 +61,56 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     e_connect_mode = co_connect_mode_accept.
   ENDMETHOD.
 
+  METHOD read_sid.
+    TRY.
+        mv_sid = io_context->get_initial_request( )->get_form_field( `sid` ).
+      CATCH cx_root.
+        CLEAR mv_sid.
+    ENDTRY.
+    IF zcl_pia_00_session_store=>is_valid_sid( mv_sid ) = abap_false.
+      TRY.
+          mv_sid = substring( val = cl_system_uuid=>create_uuid_c32_static( ) len = 22 ).
+        CATCH cx_root.
+          mv_sid = |S{ sy-uzeit }{ sy-datum }|.
+      ENDTRY.
+    ENDIF.
+  ENDMETHOD.
+
   METHOD if_apc_wsp_extension~on_start.
     mo_msg_mgr = i_message_manager.
-    mv_running = abap_false.
-
-    " Bind AMC consumer: Node.js broker pushes events to WebSocket
+    read_sid( i_context ).
+    mv_backend = zcl_pia_20_backend=>default( )->get_name( ).
+    " ?mode=job|daemon|inline overrides PIA_TURN_MODE for this connection (to compare the two)
     TRY.
-        DATA(lo_binding) = i_context->get_binding_manager( ).
-        lo_binding->bind_amc_message_consumer(
-          i_application_id = 'ZPIA_AMC'
-          i_channel_id     = '/events' ).
+        mv_mode = to_lower( i_context->get_initial_request( )->get_form_field( `mode` ) ).
+      CATCH cx_root.
+        CLEAR mv_mode.
+    ENDTRY.
+    IF mv_mode IS INITIAL.
+      mv_mode = to_lower( zcl_pia_00_config=>get( `PIA_TURN_MODE` ) ).
+    ENDIF.
+    IF mv_mode <> `inline` AND mv_mode <> `job` AND mv_mode <> `daemon`.
+      mv_mode = COND #( WHEN mv_backend = `SAP-ADT` THEN `job` ELSE `inline` ).
+    ENDIF.
+
+    " this session's channel: the turn publishes there wherever it runs
+    TRY.
+        i_context->get_binding_manager( )->bind_amc_message_consumer(
+          i_application_id       = 'ZPIA_AMC'
+          i_channel_id           = '/events'
+          i_channel_extension_id = CONV #( mv_sid ) ).
         mv_bound = abap_true.
       CATCH cx_root INTO DATA(lx_bind).
         mv_bound = abap_false.
         send( |{ gv_red }live events off: { lx_bind->get_text( ) }{ gv_reset }{ c_crlf }| ).
     ENDTRY.
 
-    boot( ).
+    DATA(lv_earlier) = lines( zcl_pia_00_session_store=>load( mv_sid )->get_messages( ) ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
-    send( |{ gv_dim }Tools: read/write/activate/run_tests · backend { gv_backend } · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
+    send( |{ gv_dim }Tools: read/write/activate/run_tests · backend { mv_backend } · turns { mv_mode }|
+       && | · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
+    send( |{ gv_dim }session { mv_sid }{ COND string( WHEN lv_earlier > 0 THEN | · resumed, { lv_earlier } earlier messages| ) }|
+       && | · /new starts a fresh one{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }Type a task and press Enter{ gv_reset }{ c_crlf }{ c_crlf }| ).
   ENDMETHOD.
 
@@ -85,88 +118,45 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     mo_msg_mgr = i_message_manager.
     TRY.
         DATA(lv_input) = i_message->get_text( ).
-        IF lv_input IS INITIAL. RETURN. ENDIF.
-        IF mv_running = abap_true.
-          send( |{ gv_red }Still processing...{ gv_reset }{ c_crlf }| ).
-          RETURN.
+        IF lv_input IS INITIAL OR lv_input = `/hb`.
+          RETURN. " heartbeat: keeps ICM from closing an idle WebSocket after 120 s
         ENDIF.
-        run_task( lv_input ).
+        start_turn( lv_input ).
       CATCH cx_root INTO DATA(lx).
-        mv_running = abap_false.
         send( |{ c_crlf }{ gv_red }ERROR: { lx->get_text( ) }{ gv_reset }{ c_crlf }| ).
+        send( gv_done ).
     ENDTRY.
-    send( gv_done ).
   ENDMETHOD.
 
-  METHOD zif_pia_00_listener~on_event.
-    CASE iv_type.
-      WHEN 'tool_start'.
-        send( gv_dim && `  > ` && iv_data && gv_reset && c_crlf ).
-      WHEN 'tool_done'.
-        send( gv_green && `  < ` && iv_data && gv_reset && c_crlf ).
-      WHEN 'answer'.
-        send( c_crlf && gv_green && iv_data && gv_reset && c_crlf ).
+  METHOD start_turn.
+    DATA lv_error TYPE string.
+    zcl_pia_00_session_store=>put_task( iv_sid = mv_sid iv_task = iv_task ).
+    CASE mv_mode.
+      WHEN `job`.
+        lv_error = zcl_pia_30_turn=>start_job( mv_sid ).
+      WHEN `daemon`.
+        " dynamic: the daemon class is SAP-only (OSG's daemon interface lacks co_setup_mode)
+        TRY.
+            CALL METHOD ('ZCL_PIA_30_TURN_DAEMON')=>('START_TURN')
+              EXPORTING iv_sid = mv_sid
+              RECEIVING rv_    = lv_error.
+          CATCH cx_root INTO DATA(lx_d).
+            lv_error = lx_d->get_text( ).
+        ENDTRY.
+      WHEN OTHERS.
+        " inline: output and the done marker still come over AMC
+        zcl_pia_30_turn=>run( mv_sid ).
     ENDCASE.
+    IF lv_error IS NOT INITIAL.
+      send( |{ c_crlf }{ gv_red }ERROR: could not start the turn ({ mv_mode }): { lv_error }{ gv_reset }{ c_crlf }| ).
+      send( gv_done ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_close.
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_error.
-  ENDMETHOD.
-
-  METHOD boot.
-    IF mo_session IS NOT BOUND.
-      mo_session = zcl_pia_00_session=>new( 'tui' ).
-    ENDIF.
-    IF go_registry IS BOUND. RETURN. ENDIF.
-    DATA(lo_backend) = zcl_pia_20_backend=>default( ).
-    gv_backend = lo_backend->get_name( ).
-    go_registry = zcl_pia_00_registry=>new( ).
-    zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
-    go_llm = zcl_pia_00_llm_http=>new( VALUE #(
-      base_url = 'https://api.z.ai/api/v1/responses'
-      model    = zcl_pia_00_config=>model( )
-      api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
-      api_type = 'responses' ) ).
-  ENDMETHOD.
-
-  METHOD run_task.
-    mv_running = abap_true.
-
-    DATA(lo_amc) = zcl_pia_00_amc_listener=>new( ).
-    DATA(lo_exec) = zcl_pia_00_executor=>new(
-      io_llm      = go_llm
-      io_registry = go_registry
-      io_session  = mo_session
-      io_listener = lo_amc ).
-
-    " stream tool events: check events before/after
-    DATA(lv_ev_before) = lines( mo_session->get_events( ) ).
-
-    DATA(ls_result) = lo_exec->run(
-      iv_task = iv_task
-      iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai) through backend { gv_backend }. If asked which model you are, say exactly that; never claim another model or vendor. |
-               && 'Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). '
-               && 'Rules: read before write; write full source; always activate after write; '
-               && 'new code goes live NEXT step, so after activate finish the turn and run_tests in the next turn. Answer briefly in the user language.'
-      iv_max_iterations = 8
-      iv_continue = abap_true ).
-
-    " post-fact tool trace, only when events did not arrive live
-    IF mv_bound = abap_true AND lo_amc->is_streaming( ) = abap_true.
-      CLEAR lv_ev_before.
-    ELSE.
-    LOOP AT mo_session->get_trace( ) INTO DATA(ls_t).
-      DATA(lv_status) = COND string( WHEN ls_t-ok = abap_true THEN |{ gv_green }ok{ gv_reset }|
-                                     ELSE |{ gv_red }FAIL{ gv_reset }| ).
-      send( |  { gv_dim }[{ ls_t-tool }] { lv_status }: { ls_t-args }{ gv_reset }{ c_crlf }| ).
-    ENDLOOP.
-    ENDIF.
-
-    send( |{ c_crlf }{ gv_green }{ ls_result-answer }{ gv_reset }{ c_crlf }{ c_crlf }| ).
-    send( |{ gv_dim }iters={ ls_result-iterations } tools={ ls_result-tool_calls }{ gv_reset }{ c_crlf }| ).
-    mv_running = abap_false.
   ENDMETHOD.
 
   METHOD send.
