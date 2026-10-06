@@ -1,36 +1,28 @@
-# Следующий шаг PIA
-1. ✅ SELF-HOSTING ДОКАЗАН (reports/2026-10-06-SELF-HOSTING.md). Дальше: MCP bridge (Claude Code -> PIA), надёжный activate (снять false-negative), M2 checkpoint/resume
-   a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
-   b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
-   c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE
-   d) отчёт коллеге; после — согласовать рестарт 8091 с их EV_JSON {active,live,note,issues} и снять "gap-aware" ветку моего адаптера
-2. ЧАТ-ДЕМО $ZPIA_30_f_web (порт $ZLLM_05) + multi-turn session
-3. M2: checkpoint/resume + backend v2
-4. Репо: github.com/oisee/pia ✅ (мастер залит, MIT)
-6. Когда чат встанет: скриншоты (терминал-multi-turn, HTML-чат, APC-workbench) → README в github.com/oisee/pia
+# Следующий шаг PIA (обновлено 2026-10-06 04:00)
 
-## Горячие хвосты чата (2026-10-06 поздняя ночь)
-- НЕТ ТАЙМАУТА на LLM-вызов: зависший z.ai блокирует весь однопоточный рантайм (дважды ловили). Фикс: таймаут в llm_http (проверить поддержку в shim-клиенте) или async. Сообщить коллеге — это общий паттерн "долгий HTTP в handler".
-- Русский ввод починен (unescape_url + \uXXXX-escape в json_util); модель ответила на бирманском -> добавлено правило языка; z.ai подвисает -> повторить тест.
-## Чат-UX (от Alice, 2026-10-06)
-- H1 только EN: "PIA — pi, writing itself in ABAP" (рус. убрать из заголовка)
-- SEND: индикатор "думает..." сразу при отправке (кнопка disabled + статус) — сейчас выглядит сломанным
-- TUI/terminal via APC + стриминг ответов — следующий фронт ($ZLLM_05 порт)
+## ✅ ЗАКРЫТО (эта сессия)
+- M0: LLM из ABAP в OSG
+- M1: Агентный цикл (read→write→activate→verify PASS)
+- P2a: CREATE/DELETE через STORE (принята OSG)
+- ЧАТ: HTML multi-turn (русский, thinking, EN-заголовок)
+- TUI: WebSocket терминал (xterm.js, echo + post-fact стрим)
+- A2A: PIA как сервер для внешних агентов
+- MCP: Claude Code → PIA bridge
+- SELF-HOSTING: PIA модифицирует свой код (полностью автономно)
+- Activate false-negative: FIX (no-refusal = success)
+- Репо: github.com/oisee/pia (MIT, скриншоты)
 
-## ✅ P2a ПРИНЯТА (2026-10-06): CREATE→RED→green→GREEN→DELETE→404 на :8091
-STORE CREATE/DELETE из ABAP работают по контракту; после рестарта 8091 с JSON CHECK/ACTIVATE — включится ветка моего адаптера (active/issues из EV_JSON).
+## 🔜 СЛЕДУЮЩИЕ ЦЕЛИ (по приоритету)
+1. M2: checkpoint/resume под P3a контракт (op_id, ACTIVATION_STATUS, generation_id)
+2. Реальный стриминг через AMC (ждать drain fix от коллеги или делать AMC push)
+3. LLM таймауты (нужен shim fix от коллеги)
+4. P3b: RUN_TESTS из ABAP (коллега работает)
+5. Устойчивый self-hosting: PIA чинит реальный баг в себе (не добавление метода)
+6. A2A multi-session + async tasks
+7. MCP: больше тулов (read/write/activate как отдельные MCP tools)
 
-## P3a wire contract (draft коллеги, 2026-10-06) — основа zif_pia_20_dev_backend v2
-- ACTIVATE JSON: state/op_id/generation_id + active/live/note/issues + type/name/created_at/updated_at/failure_stage
-- Lookup: STORE ACTIVATION_STATUS IV_JSON={op_id} — тот же документ, read-only; unknown/expired -> NOT_FOUND
-- Retention: terminal >=24h; pending жив пока host; журнал вне serving child; parent restart: unfinished->failed/recovery (без ложного published)
-- Реализация в docs/abap-development-api.md секция 'P3a wire contract'
-- P3a-уточнения (review): op_id даже при refusal (refusal->failed сразу); checked=промежуточный; CHECK без op; completed_at терминально-иммутабельно; published историчен -> RUN_TESTS сверяет expected_generation и явно отказывает; решение о тестах по state=published (не active/live)
-- P3a impl (2026-10-06): журнал + ACTIVATION_STATUS, pending->published/failed, recovery, >=24h retention, 10 focused PASS (гонки владения/IPC и потеря op_id закрыты ревью). SCOPE: lookup на ТОТ ЖЕ порт source-host; журнал по root+HTTP-port; второй владелец отказывается. На 8091 ещё не загружен — жду live GO.
-- P3a: LIVE_GO получен, механизм доказан коллегой из ABAP. МОЙ probe (zpia_p3a_probe) не публикуется: ACT=200 -> 'not built' — прогнать CHECKRUN источника, найти отказ. Адаптер на op_id готов к подключению.
-
-## A2A + MCP (2026-10-06, от Alice)
-- $ZPIA_30: A2A handler (порт zcl_llm_00_a2a_handler) — PIA как A2A-сервер: внешний агент (Claude/Copilot) даёт задачу, PIA выполняет тулами в SAP/OSG
-- $ZPIA_30: A2A client (порт zcl_llm_00_a2a_client) — PIA зовёт внешних агентов для подзадач
-- MCP: потом, через a2a-mcp-server bridge
-TUI: ✅ DONE (echo + LLM post-fact streaming, screenshots in README)
+## 🏗 Инфраструктура
+- PIA сервер: :8020 (диапазон 20-29, heavy-wrapper, OSD_BIND=0.0.0.0)
+- Коллега OSG: :8091 (диапазон 90-99, P3a EV_JSON готов, ждёт загрузки)
+- Метроном: cron */9, herdr pane run
+- Codex-approver: авто-approve read-only, уведомление на опасное

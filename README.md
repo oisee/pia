@@ -21,6 +21,15 @@
 
 The same agent loop that talks to the LLM also **reads, writes, activates and verifies ABAP objects in the system it runs in** — including itself (self-hosting, see `docs/`).
 
+## Interfaces
+
+| Interface | URL | Description |
+|---|---|---|
+| HTML Chat | `/sap/bc/zpia_chat/` | Multi-turn chat with tool trace |
+| TUI Terminal | `/sap/bc/zpia_tui/` | xterm.js + WebSocket |
+| A2A Server | `/sap/bc/zpia_a2a/` | Agent-to-Agent protocol |
+| MCP Bridge | `mcp/pia-mcp-server.mjs` | Claude Code integration |
+
 ## Status
 
 - **M0** — LLM connectivity from ABAP inside OSG (TLS, providers) ✅
