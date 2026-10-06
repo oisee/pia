@@ -130,7 +130,7 @@ CLASS zcl_pia_00_session IMPLEMENTATION.
       zcl_pia_00_json_util=>extract_str( iv_json = iv_json iv_name = 'task' ) ).
 
     DATA lv_it TYPE string.
-    FIND FIRST OCCURRENCE OF REGEX '"iterations"' && '\s*:\s*(\d+)' IN iv_json SUBMATCHES lv_it.
+    FIND FIRST OCCURRENCE OF PCRE '"iterations"' && '\s*:\s*(\d+)' IN iv_json SUBMATCHES lv_it.
     mv_iterations = lv_it.
 
     DATA(lv_msgs) = zcl_pia_00_json_util=>extract_balanced(

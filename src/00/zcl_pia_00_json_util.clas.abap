@@ -5,6 +5,10 @@ CLASS zcl_pia_00_json_util DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_        TYPE string
       RETURNING VALUE(rv_) TYPE string.
 
+    CLASS-METHODS codepoint
+      IMPORTING iv_        TYPE string
+      RETURNING VALUE(rv_) TYPE i.
+
     CLASS-METHODS to_int
       IMPORTING iv_        TYPE string
       RETURNING VALUE(rv_) TYPE i.
@@ -41,6 +45,7 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
     DATA lv_i TYPE i.
     DATA lv_len TYPE i.
     DATA lv_ch TYPE string.
+    DATA lv_cp TYPE i.
     lv_len = strlen( iv_ ).
     WHILE lv_i < lv_len.
       lv_ch = iv_+lv_i(1).
@@ -54,27 +59,47 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
             rv_ = rv_ && `\r`.
           ELSEIF lv_ch = |\t|.
             rv_ = rv_ && `\t`.
-          ELSEIF strlen( cl_abap_codepage=>convert_to( lv_ch ) ) <= 2.
-            rv_ = rv_ && lv_ch. " ASCII fast path
           ELSE.
-            " non-ASCII -> \uXXXX (UTF-8 bytes -> codepoint)
-            DATA(lv_hex) = to_upper( cl_abap_codepage=>convert_to( lv_ch ) ).
-            DATA(lv_n) = strlen( lv_hex ) / 2.
-            DATA lv_cp TYPE i.
-            IF lv_n = 2.
-              lv_cp = ( to_int( substring( val = lv_hex off = 0 len = 2 ) ) - 192 ) * 64 + ( to_int( substring( val = lv_hex off = 2 len = 2 ) ) - 128 ).
-            ELSEIF lv_n = 3.
-              lv_cp = ( to_int( substring( val = lv_hex off = 0 len = 2 ) ) - 224 ) * 4096
-                    + ( to_int( substring( val = lv_hex off = 2 len = 2 ) ) - 128 ) * 64
-                    + ( to_int( substring( val = lv_hex off = 4 len = 2 ) ) - 128 ).
+            " codepoint from the UTF-8 bytes, read with xstrlen and x(1) offsets: portable to SAP
+            " (the old strlen/to_upper on an xstring did not compile there) and independent of
+            " cl_abap_conv_out_ce=>uccpi, which is wrong in open-abap-core (high byte * 255)
+            lv_cp = codepoint( lv_ch ).
+            IF lv_cp >= 32 AND lv_cp < 128.
+              rv_ = rv_ && lv_ch.
             ELSE.
-              lv_cp = 63. " fallback '?'
+              rv_ = rv_ && `\u` && to_hex4( lv_cp ).
             ENDIF.
-            rv_ = rv_ && `\u` && to_hex4( lv_cp ).
           ENDIF.
       ENDCASE.
       lv_i = lv_i + 1.
     ENDWHILE.
+  ENDMETHOD.
+
+  METHOD codepoint.
+    DATA lv_x TYPE xstring.
+    DATA lv_b TYPE x LENGTH 1.
+    DATA lv_b0 TYPE i.
+    DATA lv_b1 TYPE i.
+    DATA lv_b2 TYPE i.
+    lv_x = cl_abap_conv_codepage=>create_out( )->convert( iv_ ).
+    lv_b = lv_x+0(1).
+    lv_b0 = lv_b.
+    CASE xstrlen( lv_x ).
+      WHEN 1.
+        rv_ = lv_b0.
+      WHEN 2.
+        lv_b = lv_x+1(1).
+        lv_b1 = lv_b.
+        rv_ = ( lv_b0 - 192 ) * 64 + ( lv_b1 - 128 ).
+      WHEN 3.
+        lv_b = lv_x+1(1).
+        lv_b1 = lv_b.
+        lv_b = lv_x+2(1).
+        lv_b2 = lv_b.
+        rv_ = ( lv_b0 - 224 ) * 4096 + ( lv_b1 - 128 ) * 64 + ( lv_b2 - 128 ).
+      WHEN OTHERS.
+        rv_ = 63. " '?': a lone UTF-16 surrogate has no UTF-8 form of its own
+    ENDCASE.
   ENDMETHOD.
 
   METHOD to_int.
@@ -107,7 +132,7 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
 
   METHOD extract_str.
     DATA(lv_re) = '"' && iv_name && '"\s*:\s*"((?:[^"\\]|\\.)*)"'.
-    FIND FIRST OCCURRENCE OF REGEX lv_re IN iv_json SUBMATCHES rv_.
+    FIND FIRST OCCURRENCE OF PCRE lv_re IN iv_json SUBMATCHES rv_.
   ENDMETHOD.
 
   METHOD unescape.
@@ -158,7 +183,8 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
     FIND FIRST OCCURRENCE OF iv_open IN lv_rest MATCH OFFSET lv_start.
     IF sy-subrc <> 0. RETURN. ENDIF.
     DATA lv_depth TYPE i VALUE 1.
-    DATA lv_pos TYPE i VALUE lv_start.
+    DATA lv_pos TYPE i.
+    lv_pos = lv_start. " VALUE takes only a constant on SAP (OSG accepted a variable)
     WHILE lv_pos < strlen( lv_rest ) - 1 AND lv_depth > 0.
       lv_pos = lv_pos + 1.
       IF lv_rest+lv_pos(1) = iv_open.
