@@ -51,6 +51,7 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
     DATA lv_len TYPE i.
     DATA lv_ch TYPE string.
     DATA lv_cp TYPE i.
+    DATA lv_from TYPE i.
     lv_len = strlen( iv_ ).
     WHILE lv_i < lv_len.
       lv_ch = iv_+lv_i(1).
@@ -68,7 +69,20 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
             " codepoint from the UTF-8 bytes, read with xstrlen and x(1) offsets: portable to SAP
             " (the old strlen/to_upper on an xstring did not compile there) and independent of
             " cl_abap_conv_out_ce=>uccpi, which is wrong in open-abap-core (high byte * 255)
+            " a character outside the BMP (emoji) is two UTF-16 units: alone, a unit fails to convert
+            " on SAP (CX_SY_CONVERSION_CODEPAGE) and becomes U+FFFD in OSG; take the pair together
             lv_cp = codepoint( lv_ch ).
+            IF lv_cp = 65533 AND lv_i + 1 < lv_len.
+              lv_from = lv_i.
+              lv_cp = codepoint( substring( val = iv_ off = lv_from len = 2 ) ).
+              IF lv_cp >= 65536.
+                lv_cp = lv_cp - 65536.
+                rv_ = rv_ && `\u` && to_hex4( 55296 + lv_cp DIV 1024 ) && `\u` && to_hex4( 56320 + lv_cp MOD 1024 ).
+                lv_i = lv_i + 2.
+                CONTINUE.
+              ENDIF.
+              lv_cp = 65533.
+            ENDIF.
             IF lv_cp >= 32 AND lv_cp < 128.
               rv_ = rv_ && lv_ch.
             ELSE.
@@ -86,7 +100,15 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
     DATA lv_b0 TYPE i.
     DATA lv_b1 TYPE i.
     DATA lv_b2 TYPE i.
-    lv_x = cl_abap_conv_codepage=>create_out( )->convert( iv_ ).
+    DATA lv_b3 TYPE i.
+    " a lone UTF-16 surrogate does not convert on SAP; caught here because the method declares
+    " no RAISING (outside it the exception would arrive as CX_SY_NO_HANDLER)
+    TRY.
+        lv_x = cl_abap_conv_codepage=>create_out( )->convert( iv_ ).
+      CATCH cx_root.
+        rv_ = 65533.
+        RETURN.
+    ENDTRY.
     lv_b = lv_x+0(1).
     lv_b0 = lv_b.
     CASE xstrlen( lv_x ).
@@ -102,8 +124,16 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
         lv_b = lv_x+2(1).
         lv_b2 = lv_b.
         rv_ = ( lv_b0 - 224 ) * 4096 + ( lv_b1 - 128 ) * 64 + ( lv_b2 - 128 ).
+      WHEN 4.
+        lv_b = lv_x+1(1).
+        lv_b1 = lv_b.
+        lv_b = lv_x+2(1).
+        lv_b2 = lv_b.
+        lv_b = lv_x+3(1).
+        lv_b3 = lv_b.
+        rv_ = ( lv_b0 - 240 ) * 262144 + ( lv_b1 - 128 ) * 4096 + ( lv_b2 - 128 ) * 64 + ( lv_b3 - 128 ).
       WHEN OTHERS.
-        rv_ = 63. " '?': a lone UTF-16 surrogate has no UTF-8 form of its own
+        rv_ = 65533.
     ENDCASE.
   ENDMETHOD.
 

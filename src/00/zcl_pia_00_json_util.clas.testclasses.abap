@@ -7,6 +7,7 @@ CLASS ltcl_json_util DEFINITION FINAL FOR TESTING
 
   PRIVATE SECTION.
     " -- escape
+    METHODS escape_emoji_pair FOR TESTING.
     METHODS escape_quotes FOR TESTING.
     METHODS escape_backslash FOR TESTING.
     METHODS escape_newline FOR TESTING.
@@ -404,6 +405,19 @@ CLASS ltcl_json_util IMPLEMENTATION.
       act = zcl_pia_00_json_util=>hexval( `z` )
       exp = 0
       msg = 'hexval: invalid z -> 0 (SUSPECT)' ).
+  ENDMETHOD.
+
+  METHOD escape_emoji_pair.
+    " U+1F60A is two UTF-16 units; built at run time (no non-BMP literal in the source)
+    DATA(lv_emoji) = zcl_pia_00_json_util=>unescape( `\uD83D\uDE0A` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zcl_pia_00_json_util=>escape( |a{ lv_emoji }b| )
+      exp = `a\uD83D\uDE0Ab`
+      msg = 'escape: surrogate pair -> \uD83D\uDE0A' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zcl_pia_00_json_util=>unescape( zcl_pia_00_json_util=>escape( lv_emoji ) )
+      exp = lv_emoji
+      msg = 'emoji round-trip' ).
   ENDMETHOD.
 
 ENDCLASS.

@@ -92,7 +92,8 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
 
     DATA(ls_result) = lo_exec->run(
       iv_task = lv_task
-      iv_system = 'You are PIA, an ABAP coding agent. Tools: read_object, write_source, activate, run_tests. '
+      iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai). If asked which model you are, say exactly that; never claim another model or vendor. |
+                 && 'Tools: read_object, write_source, activate, run_tests. '
                && 'Read before write. Write FULL source. Activate after write. Answer briefly.'
       iv_max_iterations = 8
       iv_continue = abap_true ).

@@ -45,7 +45,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
         io_llm = mo_llm io_registry = mo_registry io_session = mo_session ).
       lo_exec->run(
         iv_task = lv_msg
-        iv_system = 'You are PIA, an ABAP coding agent running inside an ABAP runtime. '
+        iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai). If asked which model you are, say exactly that; never claim another model or vendor. |
                  && 'Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). '
                  && 'Rules: read before write; always activate after write; new code goes live NEXT step, so after activate finish the turn and run_tests in the next turn. '
                  && 'Answer briefly. ALWAYS answer in the language of the user message. If asked to just talk - talk.'

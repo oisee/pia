@@ -26,7 +26,7 @@ CLASS zcl_pia_90_agent_run IMPLEMENTATION.
     DATA(ls) = lo_exec->run(
       iv_task = 'Class ZCL_PIA_DEMO: method ADD returns a - b but must return a + b. '
              &&  'Read the class, write the full corrected source, activate it.'
-      iv_system = 'You are PIA, an ABAP coding agent running inside an ABAP runtime. '
+      iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai). If asked which model you are, say exactly that; never claim another model or vendor. |
                && 'Tools: read_object(name), write_source(name, source, include), activate(name), run_tests(name). '
                && 'Rules: read before write; write_source takes the COMPLETE class source; '
                && 'always activate after write; the new code goes live in the NEXT step, '
