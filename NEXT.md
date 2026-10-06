@@ -1,5 +1,5 @@
 # Следующий шаг PIA
-1. A2A ✅ DONE (agent card + send + tools). Next: MCP bridge, multi-session A2A, async tasks
+1. SELF-HOSTING DEMO: PIA модифицирует собственный код (читает себя -> пишет -> активирует -> использует новую версию)
    a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
    b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
    c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE
