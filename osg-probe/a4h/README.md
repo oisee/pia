@@ -42,3 +42,16 @@ Lessons from the first install:
 - Re-importing with --overwrite created nested SICF nodes (/sap/bc/zpia_tui/zpia_tui/); harmless, to be cleaned
   with SAP(action="system", params={"type":"git_delete_objects", ...}) which takes names with spaces.
 - Source lines over 255 characters break on SAP ("Literals across more than one line").
+
+## Turn modes (0.1: job; daemon is 0.1.+)
+
+- `job` (default on SAP): the push channel writes the task beside the session file and schedules job
+  `PIA_<sid>` (report ZPIA_TURN). ~10 s per simple turn, first tool event after 4.5-5.5 s. Works.
+- `daemon` (0.1.+, not working yet): ZPIA_DAEMON starts daemon PIA_TURNS (from a job: a push channel may
+  not touch CL_ABAP_DAEMON_CLIENT), the daemon subscribes to AMC ZPIA_AMC /turns, the terminal publishes
+  the sid there. Observed: nothing happens, ICM closes the socket after 120 s. To check: does AMC reach the
+  daemon at all (daemons get AMC only while waiting between callbacks), or does the turn die inside the
+  daemon on the same forbidden statements (ABAP Unit sandbox, ADT loopback)? Next: log receive() into
+  INDX, try a trivial turn without tools, and if ABAP Unit is forbidden in daemons, let the daemon keep the
+  session and hand tool calls to jobs.
+- `inline`: OSG only.
