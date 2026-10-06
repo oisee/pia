@@ -13,6 +13,7 @@ CLASS zcl_pia_00_executor DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING io_llm      TYPE REF TO zif_pia_00_llm
                 io_registry TYPE REF TO zcl_pia_00_registry
                 io_session  TYPE REF TO zcl_pia_00_session
+                io_listener TYPE REF TO zif_pia_00_listener OPTIONAL
       RETURNING VALUE(ro_)  TYPE REF TO zcl_pia_00_executor.
 
     METHODS run
@@ -26,6 +27,11 @@ CLASS zcl_pia_00_executor DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mo_llm      TYPE REF TO zif_pia_00_llm.
     DATA mo_registry TYPE REF TO zcl_pia_00_registry.
     DATA mo_session  TYPE REF TO zcl_pia_00_session.
+    DATA mo_listener TYPE REF TO zif_pia_00_listener.
+
+    METHODS fire
+      IMPORTING iv_type TYPE string
+                iv_data TYPE string DEFAULT ''.
 
 ENDCLASS.
 
@@ -36,6 +42,16 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
     ro_->mo_llm = io_llm.
     ro_->mo_registry = io_registry.
     ro_->mo_session = io_session.
+    ro_->mo_listener = io_listener.
+  ENDMETHOD.
+
+  METHOD fire.
+    IF mo_listener IS BOUND.
+      TRY.
+          mo_listener->on_event( iv_type = iv_type iv_data = iv_data ).
+        CATCH cx_root.
+      ENDTRY.
+    ENDIF.
   ENDMETHOD.
 
   METHOD run.
@@ -67,6 +83,7 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
       ENDIF.
 
       IF lt_calls IS INITIAL.
+        fire( iv_type = 'answer' iv_data = lv_answer ).
         rs_-answer = lv_answer.
         rs_-ok = abap_true.
         rs_-iterations = mo_session->mv_iterations.
@@ -81,6 +98,7 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
       LOOP AT lt_calls INTO DATA(ls_call).
         mo_session->inc_tool_call( ).
         mo_session->evt( |tool_started { ls_call-name }| ).
+        fire( iv_type = 'tool_start' iv_data = ls_call-name && ' ' && ls_call-arguments ).
 
         DATA(ls_result) = mo_registry->invoke_call( ls_call ).
 
@@ -100,6 +118,7 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
                        '","content":"' && zcl_pia_00_json_util=>escape( lv_out ) && '"' ).
 
         mo_session->evt( |tool_finished { ls_call-name } ok={ ls_result-ok }| ).
+        fire( iv_type = 'tool_done' iv_data = ls_call-name && COND #( WHEN ls_result-ok = abap_true THEN ' ok' ELSE ' FAIL' ) ).
       ENDLOOP.
     ENDWHILE.
 

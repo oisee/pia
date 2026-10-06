@@ -4,6 +4,7 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    INTERFACES zif_pia_00_listener.
     METHODS if_apc_wsp_extension~on_accept REDEFINITION.
     METHODS if_apc_wsp_extension~on_start REDEFINITION.
     METHODS if_apc_wsp_extension~on_message REDEFINITION.
@@ -63,6 +64,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_message.
+    mo_msg_mgr = i_message_manager.
     TRY.
         DATA(lv_input) = i_message->get_text( ).
         IF lv_input IS INITIAL. RETURN. ENDIF.
@@ -73,6 +75,17 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
         run_task( lv_input ).
       CATCH cx_apc_error.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD zif_pia_00_listener~on_event.
+    CASE iv_type.
+      WHEN 'tool_start'.
+        send( gv_dim && '  > ' && iv_data && gv_reset && c_crlf ).
+      WHEN 'tool_done'.
+        send( gv_green && '  < ' && iv_data && gv_reset && c_crlf ).
+      WHEN 'answer'.
+        send( c_crlf && gv_green && iv_data && gv_reset && c_crlf ).
+    ENDCASE.
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_close.
@@ -97,7 +110,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
       model    = 'glm-5.3-flash'
-      api_key  = 'd8***********************************************'
+      api_key  = 'PIA_ZAI_KEY'
       api_type = 'responses' ) ).
     go_session = zcl_pia_00_session=>new( 'tui' ).
   ENDMETHOD.
@@ -109,7 +122,8 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     DATA(lo_exec) = zcl_pia_00_executor=>new(
       io_llm      = go_llm
       io_registry = go_registry
-      io_session  = go_session ).
+      io_session  = go_session
+      io_listener = me ).
 
     " stream tool events: check events before/after
     DATA(lv_ev_before) = lines( go_session->get_events( ) ).
