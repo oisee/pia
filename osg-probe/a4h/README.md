@@ -25,3 +25,20 @@ Findings while porting:
 - writing a class include whose name exists but has no source (`...CCAU does not have any inactive
   version`, HTTP 500) needs POST /includes first, like a 404.
 - aunit details: `<detail text="Expected [5] Actual [1-]"/>`; negative numbers print as `1-`.
+
+## Front ends in $ZPIA (abapGit import)
+
+`abapgit-front/` holds the SICF files in abapGit's naming (name padded to 15 + hash of the parent node):
+`64ad2b3a5b1a9bfe420f1ef3e` = /sap/bc/, `c4b74e9e2a43316bca6442d43` = /sap/bc/apc/sap/. Classes, SAPC and SAMC
+come from `src/`. Zip `.abapgit.xml` + `src/` and run `vsp -s a4h-vsp git import-zip <zip> --package '$ZPIA'`.
+
+Lessons from the first install:
+- A SAPC imported by abapGit does not generate its ICF node under /sap/bc/apc/sap/; import that SICF node
+  explicitly (abapgit-front has it). Without it the WebSocket handshake fails and the TUI loops Connecting/Disconnected.
+- `vsp deploy` checks syntax before writing. If the check fails (dependencies not there yet), a NEW object is left
+  as an empty stub (`CREATE PRIVATE`, empty sections); activating it later activates the stub. Symptoms:
+  "Method NEW is unknown", or APC "The constructor of the class ... is PRIVATE". Deploy in dependency order and
+  compare line counts with the repo (`vsp -s a4h-vsp source CLAS <name> | wc -l`).
+- Re-importing with --overwrite created nested SICF nodes (/sap/bc/zpia_tui/zpia_tui/); harmless, to be cleaned
+  with SAP(action="system", params={"type":"git_delete_objects", ...}) which takes names with spaces.
+- Source lines over 255 characters break on SAP ("Literals across more than one line").
