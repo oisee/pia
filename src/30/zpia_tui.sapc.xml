@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_SAPC" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <SAPC>
+    <HEADER>
+     <APPLICATION_ID>ZPIA_TUI</APPLICATION_ID>
+     <VERSION>A</VERSION>
+     <PATH>/sap/bc/apc/sap/zpia_tui</PATH>
+     <CLASS_NAME>ZCL_PIA_30_F_TUI_APC</CLASS_NAME>
+     <APPLICATION_VERSION>1</APPLICATION_VERSION>
+     <STATEFUL>X</STATEFUL>
+    </HEADER>
+    <TEXT>
+     <APPLICATION_ID>ZPIA_TUI</APPLICATION_ID>
+     <VERSION>A</VERSION>
+     <LANG>E</LANG>
+     <DESCRIPTION>PIA Terminal</DESCRIPTION>
+    </TEXT>
+   </SAPC>
+  </asx:values>
+ </asx:abap>
+</abapGit>
