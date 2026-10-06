@@ -1,5 +1,5 @@
 # Следующий шаг PIA
-1. TUI/terminal via APC + стриминг (порт $ZLLM_05 -> zcl_pia_30_f_tui): APC-хендлер + xterm.js, подписка на event log сессии; до стриминга LLM — стрим тул-событий. (ЧАТ-UX: EN-H1 + thinking — СДЕЛАНО 2026-10-06)
+1. A2A ✅ DONE (agent card + send + tools). Next: MCP bridge, multi-session A2A, async tasks
    a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
    b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
    c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE
@@ -33,3 +33,4 @@ STORE CREATE/DELETE из ABAP работают по контракту; посл
 - $ZPIA_30: A2A handler (порт zcl_llm_00_a2a_handler) — PIA как A2A-сервер: внешний агент (Claude/Copilot) даёт задачу, PIA выполняет тулами в SAP/OSG
 - $ZPIA_30: A2A client (порт zcl_llm_00_a2a_client) — PIA зовёт внешних агентов для подзадач
 - MCP: потом, через a2a-mcp-server bridge
+TUI: ✅ DONE (echo + LLM post-fact streaming, screenshots in README)
