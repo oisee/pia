@@ -1,4 +1,5 @@
-// End-to-end UI test of the PIA terminal: red -> fix -> green, in English, Danish and Russian.
+// End-to-end UI test of the PIA terminal: green -> break -> red -> fix -> green, in English, Danish and Russian.
+// Five turns, because on open-steamgate an activation publishes at the end of the turn (tests run in the next one).
 // usage: node tui-e2e.mjs [base-url] [lang,...]   default: A4H, en,da,ru
 // Credentials: the a4h-vsp entry of ~/dev/pia/.mcp.json (never printed). Screenshots: ./shots/<lang>-<n>-<step>.png
 import {readFileSync, mkdirSync} from "node:fs";
@@ -20,15 +21,18 @@ const STEPS = {
   en: [["green", `Run the tests of ${CLS}.`, /pass|green|passed/i],
        ["break", `In ${CLS}, change add to a - b and activate it.`, /activat/i],
        ["red", `Run the tests of ${CLS} again.`, /-1|1-|fail|red/i],
-       ["fix", `Change add back to a + b, activate and run the tests.`, /pass|green|passed/i]],
+       ["fix", `Change add back to a + b and activate it.`, /activat/i],
+       ["green2", `Run the tests of ${CLS} once more.`, /pass|green|passed/i]],
   da: [["green", `Kør testene for ${CLS}.`, /pass|grøn|bestået|lykkedes/i],
        ["break", `I ${CLS}: ændr add til a - b og aktiver klassen.`, /aktiv/i],
        ["red", `Kør testene for ${CLS} igen.`, /-1|1-|fejl|fail|rød/i],
-       ["fix", `Ændr add tilbage til a + b, aktiver og kør testene.`, /pass|grøn|bestået|lykkedes/i]],
+       ["fix", `Ændr add tilbage til a + b og aktiver klassen.`, /aktiv/i],
+       ["green2", `Kør testene for ${CLS} en gang til.`, /pass|grøn|bestået|lykkedes/i]],
   ru: [["green", `Запусти тесты ${CLS}.`, /pass|green|зелён|прош|пройден|успешн/i],
        ["break", `В ${CLS} замени в add сложение на вычитание (a - b) и активируй.`, /активир/i],
        ["red", `Запусти тесты ${CLS} ещё раз.`, /-1|1-|упал|fail|красн/i],
-       ["fix", `Верни a + b, активируй и запусти тесты.`, /pass|green|зелён|прош|пройден|успешн/i]],
+       ["fix", `Верни a + b и активируй.`, /активир/i],
+       ["green2", `Запусти тесты ${CLS} ещё раз.`, /pass|green|зелён|прош|пройден|успешн/i]],
 };
 mkdirSync(join(here, SHOTS), {recursive: true});
 const b = await chromium.launch({executablePath: "/home/alice/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"});

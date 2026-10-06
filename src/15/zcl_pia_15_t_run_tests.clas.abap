@@ -43,6 +43,10 @@ CLASS zcl_pia_15_t_run_tests IMPLEMENTATION.
       rs_ = fail( 'activation not published yet: finish this turn, run tests in the next turn' ).
       RETURN.
     ENDIF.
+    IF ls-source CS 'GENERATION_UNAVAILABLE'.
+      rs_ = fail( 'no activated version yet: activate the class, finish this turn, run tests in the next turn' ).
+      RETURN.
+    ENDIF.
     " the raw result is compact JSON; the model reads it directly
     lv_out = ls-source.
     IF strlen( lv_out ) > 6000.
