@@ -53,10 +53,24 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND '}' TO lv.
     APPEND 'function prompt(){term.write("\x1b[36m> \x1b[0m")}' TO lv.
     APPEND 'function send(text){if(ws&&ws.readyState===1){ws.send(text);startStatus()}}' TO lv.
+    " clipboard: selection is copied at once; Ctrl+C copies a selection or clears the line; Ctrl+V pastes.
+    " Plain http on a LAN address has no navigator.clipboard, so copy falls back to execCommand.
+    APPEND 'function copyText(t){if(!t)return;' TO lv.
+    APPEND 'if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).catch(()=>legacyCopy(t))}else legacyCopy(t)}' TO lv.
+    APPEND 'function legacyCopy(t){const a=document.createElement("textarea");a.value=t;a.style.position="fixed";a.style.opacity="0";' TO lv.
+    APPEND 'document.body.appendChild(a);a.select();try{document.execCommand("copy")}catch(e){}a.remove();term.focus()}' TO lv.
+    APPEND 'term.onSelectionChange(()=>{const t=term.getSelection();if(t)copyText(t)});' TO lv.
+    APPEND 'term.attachCustomKeyEventHandler(e=>{if(e.type!=="keydown"||!e.ctrlKey)return true;const k=e.key.toLowerCase();' TO lv.
+    APPEND 'if(k==="c"){if(term.hasSelection()){copyText(term.getSelection());term.clearSelection();return false}' TO lv.
+    APPEND 'if(!st&&input){term.write("^C\r\n");input="";prompt()}return false}' TO lv.
+    APPEND 'if(k==="v")return false;' TO lv.
+    APPEND 'return true});' TO lv.
+    APPEND 'function typeText(t){t=t.replace(/\r\n|\r|\n/g," ");input+=t;term.write(t)}' TO lv.
     APPEND 'term.onData((data)=>{if(st)return;' TO lv.
     APPEND 'if(data==="\r"){term.writeln("");if(input.trim())send(input);else prompt();input=""}' TO lv.
     APPEND 'else if(data==="\x7f"){if(input.length>0){input=input.slice(0,-1);term.write("\b \b")}}' TO lv.
-    APPEND 'else if(data>=" "){input+=data;term.write(data)}' TO lv.
+    APPEND 'else if(data.length>1){typeText(data.replace(/\x1b\[20[01]~/g,""))}' TO lv.
+    APPEND 'else if(data>=" "){typeText(data)}' TO lv.
     APPEND '});' TO lv.
     APPEND 'connect();' TO lv.
     APPEND '</script></body></html>' TO lv.
