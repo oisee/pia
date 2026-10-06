@@ -7,7 +7,7 @@ its ABAP Unit tests — on the same system it runs in, through ADT, as you. ABAP
 what PIA is made of: the agent loop, the LLM client, the tools and the terminal are ABAP classes in the same
 system, so PIA can read, change and re-activate itself (self-hosting, `reports/2026-10-06-SELF-HOSTING.md`).
 
-![PIA on SAP A4H: tests go red after a change, PIA fixes it, tests go green](screenshots/a4h-tui/en-3-red.png)
+![PIA on SAP A4H: tests go red after a change, PIA fixes it, tests go green](screenshots/a4h-tui-011/en-3-red.png)
 
 ```
 > Run the tests of ZCL_PIA_DEMO4.
@@ -39,7 +39,7 @@ break `add` → tests red → fix → tests green, five turns per language, 15/1
 
 | English | Dansk | Русский |
 |---|---|---|
-| ![en](screenshots/a4h-tui/en-4-fix.png) | ![da](screenshots/a4h-tui/da-3-red.png) | ![ru](screenshots/a4h-tui/ru-4-fix.png) |
+| ![en](screenshots/a4h-tui-011/en-5-green2.png) | ![da](screenshots/a4h-tui-011/da-3-red.png) | ![ru](screenshots/a4h-tui-011/ru-3-red.png) |
 
 ## Install on SAP (7.58, tested on the ABAP Platform Trial A4H)
 
