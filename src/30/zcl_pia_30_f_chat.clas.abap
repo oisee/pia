@@ -89,7 +89,8 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
         APPEND '<div class="msg t">' && lv_ev && '</div>' TO lv.
       ENDIF.
     ENDLOOP.
-    APPEND `<form method="post" onsubmit="document.getElementById('think').style.display='block';this.style.display='none'"><textarea name="msg" id="msg" rows="2" placeholder="task or question... (Enter=send, Shift+Enter=newline)" autofocus></textarea><button id="sb" type="submit">Send</button></form>` TO lv.
+    APPEND `<form method="post" onsubmit="document.getElementById('think').style.display='block';this.style.display='none'">` TO lv. " SAP source lines are limited to 255 characters
+    APPEND `<textarea name="msg" id="msg" rows="2" placeholder="task or question... (Enter=send, Shift+Enter=newline)" autofocus></textarea><button id="sb" type="submit">Send</button></form>` TO lv.
     APPEND `<script>const ta=document.getElementById('msg');ta.addEventListener('keydown',e=>{if((e.key==='Enter')&&!e.shiftKey){e.preventDefault();ta.form.submit();}});</script>` TO lv.
     APPEND |<p class="it">iters={ mo_session->mv_iterations } tools={ mo_session->mv_tool_calls } &middot; { zcl_pia_00_config=>model( ) }</p>| TO lv.
     APPEND '</body></html>' TO lv.
