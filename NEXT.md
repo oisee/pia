@@ -1,5 +1,5 @@
 # Следующий шаг PIA
-1. SELF-HOSTING DEMO: PIA модифицирует собственный код (читает себя -> пишет -> активирует -> использует новую версию)
+1. ✅ SELF-HOSTING ДОКАЗАН (reports/2026-10-06-SELF-HOSTING.md). Дальше: MCP bridge (Claude Code -> PIA), надёжный activate (снять false-negative), M2 checkpoint/resume
    a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
    b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
    c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE

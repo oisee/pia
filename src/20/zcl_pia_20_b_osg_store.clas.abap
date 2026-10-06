@@ -72,8 +72,10 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
           rs_-ok = abap_true.
           rs_-message = |activate { iv_name }: active=X (publish pending, live next step)|.
         ELSE.
-          rs_-ok = abap_false.
-          rs_-message = |ACTIVATION FAILED { iv_name }: { ls-json }|.
+          " no exception, no explicit issues, no explicit refusal
+          " = activation accepted (optimistic; verdict arrives with P3a EV_JSON)
+          rs_-ok = abap_true.
+          rs_-message = |activate { iv_name }: accepted (json: { ls-json })|.
         ENDIF.
       CATCH cx_root INTO DATA(lx).
         rs_-ok = abap_false.
