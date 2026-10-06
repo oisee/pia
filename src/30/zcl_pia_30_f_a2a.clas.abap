@@ -88,7 +88,9 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
     DATA(lv_checkpoint) = zcl_pia_00_json_util=>extract_str(
       iv_json = iv_body iv_name = 'checkpoint' ).
     IF lv_checkpoint IS NOT INITIAL.
-      go_session->from_json( zcl_pia_00_json_util=>unescape( lv_checkpoint ) ).
+      " checkpoint is base64-encoded to avoid JSON escaping issues
+      go_session->from_json(
+        cl_http_utility=>decode_base64( lv_checkpoint ) ).
     ENDIF.
 
     DATA(lo_exec) = zcl_pia_00_executor=>new(
@@ -126,7 +128,7 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
 
     " checkpoint for resume
     APPEND '"checkpoint":"' &&
-           zcl_pia_00_json_util=>escape( go_session->to_json( ) ) &&
+           cl_http_utility=>encode_base64( go_session->to_json( ) ) &&
            '"}' TO lt.
 
     rv_ = concat_lines_of( table = lt ).
