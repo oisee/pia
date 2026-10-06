@@ -14,3 +14,4 @@ certs-a4h/
 .vsp.json
 
 osg-probe/ui/shots/
+release/*.zip

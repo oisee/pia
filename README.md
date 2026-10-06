@@ -1,51 +1,93 @@
 # PIA — Pi-ABAP Agent
 
-**ABAP-native headless coding agent runtime**: pluggable development backends, pluggable user interfaces.
+**A coding agent written in ABAP, running inside SAP, that writes, activates and tests ABAP.**
 
-> ABAP becomes the implementation language of the coding agent itself.
+You type a task into a terminal in your browser. PIA reads the class, writes the fix, activates it and runs
+its ABAP Unit tests — on the same system it runs in, through ADT, as you.
 
-## What it is
+![PIA on SAP A4H: tests go red after a change, PIA fixes it, tests go green](screenshots/a4h-tui/en-3-red.png)
 
 ```
-            LLM (z.ai glm-5.3-flash / Ollama / Azure)
-                          │  Responses API / chat completions
-                          ▼
-        $ZPIA_00  agent core: executor · session(+messages) · registry · event log
-                          │  tools
-        $ZPIA_10/15  read_object · write_source · activate · …
-                          │  zif_pia_20_dev_backend
-        $ZPIA_20  OSG store-seam (in-process) · ADT REST (cross-system) · SAP-native
-                          ▼
-                 OSG  ·  SAP (a4h)
+> Run the tests of ZCL_PIA_DEMO4.
+  > run_tests {"name":"ZCL_PIA_DEMO4"}
+  < run_tests ok
+Tests failed: LTCL_ADD->ADD_2_3 expected 5, actual -1 (line 4)
+> Change add back to a + b, activate and run the tests.
+  > write_source …   < write_source ok
+  > activate …       < activate ok
+  > run_tests …      < run_tests ok
+GREEN: 1 passed, 0 failed
 ```
 
-The same agent loop that talks to the LLM also **reads, writes, activates and verifies ABAP objects in the system it runs in** — including itself (self-hosting, see `docs/`).
+## What's in 0.1
 
-## Interfaces
+| | |
+|---|---|
+| **Terminal** | xterm.js over an ABAP Push Channel: live tool events (over AMC), a status line while the agent works, type-ahead with a queue, Up/Down history, copy on select, Ctrl+V |
+| **Agent loop** | `read_object` · `write_source` (main or `testclasses`) · `activate` · `run_tests`; up to 8 steps per turn; answers in the language you write in |
+| **Sessions** | conversations survive reconnects and reloads (`/new` starts a fresh one) |
+| **SAP backend** | ADT REST on the same system via `cl_http_client=>create_internal` — your user, no password, local (`$…`) packages only |
+| **Turns off the push channel** | SAP forbids ABAP Unit and source writes inside an APC handler, so each turn runs as a background job `PIA_<session>` and streams back over AMC |
+| **LLM** | z.ai `glm-5.3` (Responses API), configurable |
+| **Also** | HTML chat `/sap/bc/zpia_chat/`, an A2A endpoint `/sap/bc/zpia_a2a/`, an MCP bridge for Claude Code (`mcp/`) |
 
-| Interface | URL | Description |
+Tested end to end with Playwright in **English, Danish and Russian** (`osg-probe/ui/tui-e2e.mjs`): tests green →
+break `add` → tests red → fix → tests green, 12/12 steps on SAP NetWeaver 7.58 (A4H).
+
+| English | Dansk | Русский |
 |---|---|---|
-| HTML Chat | `/sap/bc/zpia_chat/` | Multi-turn chat with tool trace |
-| TUI Terminal | `/sap/bc/zpia_tui/` | xterm.js + WebSocket |
-| A2A Server | `/sap/bc/zpia_a2a/` | Agent-to-Agent protocol |
-| MCP Bridge | `mcp/pia-mcp-server.mjs` | Claude Code integration |
+| ![en](screenshots/a4h-tui/en-4-fix.png) | ![da](screenshots/a4h-tui/da-3-red.png) | ![ru](screenshots/a4h-tui/ru-4-fix.png) |
 
-## Status
+## Install on SAP (7.58, tested on the ABAP Platform Trial A4H)
 
-- **M0** — LLM connectivity from ABAP inside OSG (TLS, providers) ✅
-- **M1** — full agent loop live: read → write → activate → verify PASS ✅ (`reports/2026-10-06-M1-live.md`)
-- **M2** — contract §2.1 with OSG: activation states, CREATE/DELETE, RUN_TESTS (in progress)
-- Chat UI (`$ZPIA_30`) — next
+1. **Import the package.** Download `pia-v0.1.0-abapgit.zip` from the release and import it with abapGit
+   (offline repository) into a new local package `$ZPIA`. With vsp:
+   `vsp git import-zip pia-v0.1.0-abapgit.zip --package '$ZPIA'`.
+2. **Trust z.ai.** In STRUST add *USERTrust RSA Certification Authority* and *Sectigo Public Server
+   Authentication Root R46* to *SSL client Anonymous* and *SSL client Standard*.
+3. **Give PIA a key.** Put a file `pia.env` into the instance's `DIR_HOME` (A4H: `/usr/sap/A4H/D00/work`),
+   readable by `<sid>adm` only:
+   ```
+   ZAI_API_KEY=...
+   PIA_MODEL=glm-5.3          # optional
+   PIA_TURN_MODE=job          # optional: job (default on SAP) | daemon (0.1.+) | inline (OSG)
+   ```
+4. **Open the terminal:** `http://<host>:<port>/sap/bc/zpia_tui/?sap-client=<client>` and log on.
+   The banner should say `backend SAP-ADT · turns job · live events on`.
 
-## Screenshots
+PIA keeps its conversations as `pia-session-<id>.txt` next to `pia.env`.
 
-![PIA chat](screenshots/chat.png)
+## On open-steamgate (preview)
 
-Live chat at `/sap/bc/zpia_chat/` (ICF + `zcl_pia_30_f_chat`): task in, tool calls and results streamed into the transcript, answer out — same session, multi-turn, glm-5.3-flash.
+PIA also runs on [open-steamgate](https://github.com/oisee/open-steamgate), the open ABAP runtime, with an
+in-process backend (STORE): tracked activation (`op_id` → `published`), `RUN_TESTS` on a pinned generation,
+warm publishing in ~2.6 s. In 0.1 this needs the development-API branch of open-steamgate
+([#626](https://github.com/oisee/open-steamgate/pull/626)); 0.1.1 will follow once it is on `main`.
 
-## Layout
+## How it is built
 
-`src/` — ABAP source (`$ZPIA_NN` packages, see `docs/2026-10-05-pia-packages-and-naming.md`) · `docs/` — architecture & decisions · `reports/` — milestone reports · `osg-probe/` — live OSG probes & ops scripts
+```
+  browser (xterm.js)  ── APC WebSocket ──  ZCL_PIA_30_F_TUI_APC  ── task file + job PIA_<sid> ──┐
+        ▲                                                                                       │
+        └──────────────── AMC  ZPIA_AMC /events (extension = session id) ◄── ZCL_PIA_30_TURN ◄─┘
+                                                                                 │
+   $ZPIA  00  core: executor · session · session store · registry · LLM client (z.ai) · JSON
+          10/15  tools: read_object · write_source · activate · run_tests
+          20  backends: ZCL_PIA_20_B_ADT (SAP, ADT REST) · ZCL_PIA_20_B_OSG_STORE (open-steamgate)
+          30  front ends: terminal · chat · A2A · turn runner · daemon (0.1.+)
+```
+
+`ZCL_PIA_20_BACKEND=>DEFAULT( )` picks the backend: the STORE backend on open-steamgate, ADT on SAP.
+Porting notes from the first SAP install are in `osg-probe/a4h/README.md`.
+
+## Known limits in 0.1
+
+- Writes only to classes that already exist, and only in local packages (`$…`).
+- One turn at a time per session; there is no way to cancel a running turn yet.
+- The daemon turn mode (a pre-started ABAP daemon fed over AMC) does not pick up turns yet: use `job`.
+- open-steamgate support is a preview until #626 is merged.
+
+What comes next is in [`docs/SUPER-BACKLOG.md`](docs/SUPER-BACKLOG.md).
 
 ## License
 
