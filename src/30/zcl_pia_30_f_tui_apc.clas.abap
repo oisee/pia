@@ -57,6 +57,9 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
   METHOD if_apc_wsp_extension~on_start.
     mo_msg_mgr = i_message_manager.
     mv_running = abap_false.
+
+    " AMC binding disabled — investigate crash
+    " TODO: re-enable after debugging bind_amc_message_consumer
     boot( ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
     send( gv_dim && 'Tools: read/write/activate' && gv_reset && c_crlf ).
