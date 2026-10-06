@@ -9,9 +9,20 @@ CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_name    TYPE string
       RETURNING VALUE(rv_) TYPE string.
 
+    " PIA_MODEL from pia.env, default glm-5.3 (glm-5.3-flash wrote invalid ABAP and empty tool args)
+    CLASS-METHODS model
+      RETURNING VALUE(rv_) TYPE string.
+
 ENDCLASS.
 
 CLASS zcl_pia_00_config IMPLEMENTATION.
+
+  METHOD model.
+    rv_ = get( `PIA_MODEL` ).
+    IF rv_ IS INITIAL.
+      rv_ = `glm-5.3`.
+    ENDIF.
+  ENDMETHOD.
 
   METHOD get.
     DATA lv_line TYPE string.

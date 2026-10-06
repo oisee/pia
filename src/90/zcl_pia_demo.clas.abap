@@ -9,7 +9,6 @@ ENDCLASS.
 
 CLASS zcl_pia_demo IMPLEMENTATION.
   METHOD add.
-    " BUG: should be a + b
     rv_ = a - b.
   ENDMETHOD.
   METHOD selfcheck.

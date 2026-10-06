@@ -21,8 +21,15 @@ INTERFACE zif_pia_20_dev_backend PUBLIC.
 
   METHODS write_source
     IMPORTING iv_name    TYPE string
-                iv_source TYPE string
+              iv_source  TYPE string
+              iv_include TYPE string OPTIONAL   " '' = main, 'testclasses' = local tests
     RETURNING VALUE(rs_) TYPE ts_result.
+
+  " ok = ran with no fail/error; message = one-line summary; source = raw result JSON
+  METHODS run_tests
+    IMPORTING it_classes             TYPE string_table
+              iv_expected_generation TYPE string OPTIONAL
+    RETURNING VALUE(rs_)             TYPE ts_result.
 
   METHODS activate
     IMPORTING iv_name    TYPE string

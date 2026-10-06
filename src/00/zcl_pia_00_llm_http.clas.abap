@@ -245,8 +245,8 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
       DATA lt_c TYPE string_table.
       LOOP AT et_calls INTO DATA(ls_c).
         APPEND '{"id":"' && ls_c-id && '","name":"' && ls_c-name &&
-               '","arguments":' &&
-               zcl_pia_00_json_util=>escape( ls_c-arguments ) && '}' TO lt_c.
+               '","arguments":"' &&
+               zcl_pia_00_json_util=>escape( ls_c-arguments ) && '"}' TO lt_c.  " a JSON string, as the API sends it
       ENDLOOP.
       ev_assistant_raw = '{"tool_calls":[' && concat_lines_of( table = lt_c sep = ',' ) && ']}'.
     ELSE.

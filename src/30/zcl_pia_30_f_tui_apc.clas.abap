@@ -73,7 +73,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
 
     boot( ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
-    send( gv_dim && 'Tools: read/write/activate' && gv_reset && c_crlf ).
+    send( gv_dim && 'Tools: read/write/activate/run_tests' && gv_reset && c_crlf ).
     send( |{ gv_dim }Type a task and press Enter{ gv_reset }{ c_crlf }{ c_crlf }| ).
   ENDMETHOD.
 
@@ -115,18 +115,10 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     IF go_session IS BOUND. RETURN. ENDIF.
     DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
     go_registry = zcl_pia_00_registry=>new( ).
-    DATA(lo_read) = NEW zcl_pia_10_t_read_object( ).
-    lo_read->set_backend( lo_backend ).
-    go_registry->register( lo_read ).
-    DATA(lo_write) = NEW zcl_pia_15_t_write_source( ).
-    lo_write->set_backend( lo_backend ).
-    go_registry->register( lo_write ).
-    DATA(lo_act) = NEW zcl_pia_15_t_activate( ).
-    lo_act->set_backend( lo_backend ).
-    go_registry->register( lo_act ).
+    zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
-      model    = 'glm-5.3-flash'
+      model    = zcl_pia_00_config=>model( )
       api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
     go_session = zcl_pia_00_session=>new( 'tui' ).
@@ -149,9 +141,9 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     DATA(ls_result) = lo_exec->run(
       iv_task = iv_task
       iv_system = 'You are PIA, an ABAP coding agent inside an ABAP runtime. '
-               && 'Tools: read_object(name), write_source(name, source - FULL source), activate(name). '
+               && 'Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). '
                && 'Rules: read before write; write full source; always activate after write; '
-               && 'new code goes live NEXT step. Answer briefly in the user language.'
+               && 'new code goes live NEXT step, so after activate finish the turn and run_tests in the next turn. Answer briefly in the user language.'
       iv_max_iterations = 8
       iv_continue = abap_true ).
 

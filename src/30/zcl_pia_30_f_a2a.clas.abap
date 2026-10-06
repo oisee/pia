@@ -21,18 +21,10 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
     IF go_session IS BOUND. RETURN. ENDIF.
     DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
     go_registry = zcl_pia_00_registry=>new( ).
-    DATA(lo_read) = NEW zcl_pia_10_t_read_object( ).
-    lo_read->set_backend( lo_backend ).
-    go_registry->register( lo_read ).
-    DATA(lo_write) = NEW zcl_pia_15_t_write_source( ).
-    lo_write->set_backend( lo_backend ).
-    go_registry->register( lo_write ).
-    DATA(lo_act) = NEW zcl_pia_15_t_activate( ).
-    lo_act->set_backend( lo_backend ).
-    go_registry->register( lo_act ).
+    zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
-      model    = 'glm-5.3-flash'
+      model    = zcl_pia_00_config=>model( )
       api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
     go_session = zcl_pia_00_session=>new( 'a2a' ).
@@ -100,7 +92,7 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
 
     DATA(ls_result) = lo_exec->run(
       iv_task = lv_task
-      iv_system = 'You are PIA, an ABAP coding agent. Tools: read_object, write_source, activate. '
+      iv_system = 'You are PIA, an ABAP coding agent. Tools: read_object, write_source, activate, run_tests. '
                && 'Read before write. Write FULL source. Activate after write. Answer briefly.'
       iv_max_iterations = 8
       iv_continue = abap_true ).

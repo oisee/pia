@@ -17,18 +17,10 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     IF mo_session IS BOUND. RETURN. ENDIF.
     DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
     mo_registry = zcl_pia_00_registry=>new( ).
-    DATA(lo_read) = NEW zcl_pia_10_t_read_object( ).
-    lo_read->set_backend( lo_backend ).
-    mo_registry->register( lo_read ).
-    DATA(lo_write) = NEW zcl_pia_15_t_write_source( ).
-    lo_write->set_backend( lo_backend ).
-    mo_registry->register( lo_write ).
-    DATA(lo_act) = NEW zcl_pia_15_t_activate( ).
-    lo_act->set_backend( lo_backend ).
-    mo_registry->register( lo_act ).
+    zcl_pia_15_toolset=>register_dev_tools( io_registry = mo_registry io_backend = lo_backend ).
     mo_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
-      model    = 'glm-5.3-flash'
+      model    = zcl_pia_00_config=>model( )
       api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
     mo_session = zcl_pia_00_session=>new( 'chat' ).
@@ -54,8 +46,8 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
       lo_exec->run(
         iv_task = lv_msg
         iv_system = 'You are PIA, an ABAP coding agent running inside an ABAP runtime. '
-                 && 'Tools: read_object(name), write_source(name, source - FULL source), activate(name). '
-                 && 'Rules: read before write; always activate after write; new code goes live NEXT step. '
+                 && 'Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). '
+                 && 'Rules: read before write; always activate after write; new code goes live NEXT step, so after activate finish the turn and run_tests in the next turn. '
                  && 'Answer briefly. ALWAYS answer in the language of the user message. If asked to just talk - talk.'
         iv_max_iterations = 8
         iv_continue = abap_true ).
@@ -99,7 +91,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     ENDLOOP.
     APPEND `<form method="post" onsubmit="document.getElementById('think').style.display='block';this.style.display='none'"><textarea name="msg" id="msg" rows="2" placeholder="task or question... (Enter=send, Shift+Enter=newline)" autofocus></textarea><button id="sb" type="submit">Send</button></form>` TO lv.
     APPEND `<script>const ta=document.getElementById('msg');ta.addEventListener('keydown',e=>{if((e.key==='Enter')&&!e.shiftKey){e.preventDefault();ta.form.submit();}});</script>` TO lv.
-    APPEND |<p class="it">iters={ mo_session->mv_iterations } tools={ mo_session->mv_tool_calls } &middot; glm-5.3-flash &middot; OSG :8020</p>| TO lv.
+    APPEND |<p class="it">iters={ mo_session->mv_iterations } tools={ mo_session->mv_tool_calls } &middot; { zcl_pia_00_config=>model( ) }</p>| TO lv.
     APPEND '</body></html>' TO lv.
     ev_html = concat_lines_of( table = lv ).
   ENDMETHOD.

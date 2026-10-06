@@ -21,11 +21,12 @@ CLASS zcl_pia_15_t_write_source IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_params.
-    rt_ = VALUE #( ( name = 'name' type = 'string' desc = 'Class name' required = abap_true ) ( name = 'source' type = 'string' desc = 'Complete new class source' required = abap_true ) ).
+    rt_ = VALUE #( ( name = 'name' type = 'string' desc = 'Class name' required = abap_true ) ( name = 'source' type = 'string' desc = 'Complete new source of the include' required = abap_true )
+                  ( name = 'include' type = 'string' desc = 'main (default) or testclasses (local ABAP Unit test classes)' required = abap_false ) ).
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_description.
-    rv_ = 'Write the FULL new source of a class (main include). Provide the complete source, not a fragment.'.
+    rv_ = 'Write the FULL new source of a class include: main (default) or testclasses. Provide the complete source, not a fragment.'.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_permission.
@@ -40,7 +41,11 @@ CLASS zcl_pia_15_t_write_source IMPLEMENTATION.
       rs_ = fail( 'name and source are required' ).
       RETURN.
     ENDIF.
-    DATA(ls) = mo_backend->write_source( iv_name = lv_name iv_source = lv_source ).
+    DATA(lv_include) = get_arg( iv_name = 'include' iv_arguments = iv_arguments ).
+    IF lv_include = 'main'.
+      CLEAR lv_include.
+    ENDIF.
+    DATA(ls) = mo_backend->write_source( iv_name = lv_name iv_source = lv_source iv_include = lv_include ).
     IF ls-ok = abap_false.
       rs_ = fail( ls-message ).
       RETURN.
