@@ -58,8 +58,16 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     mo_msg_mgr = i_message_manager.
     mv_running = abap_false.
 
-    " AMC binding disabled — investigate crash
-    " TODO: re-enable after debugging bind_amc_message_consumer
+    " Bind AMC consumer: Node.js broker pushes events to WebSocket
+    TRY.
+        DATA(lo_binding) = i_context->get_binding_manager( ).
+        lo_binding->bind_amc_message_consumer(
+          i_application_id = 'ZPIA_AMC'
+          i_channel_id     = '/events' ).
+      CATCH cx_root.
+        " AMC optional — fallback to post-fact streaming
+    ENDTRY.
+
     boot( ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
     send( gv_dim && 'Tools: read/write/activate' && gv_reset && c_crlf ).
@@ -122,11 +130,12 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     mv_running = abap_true.
     send( |{ c_crlf }{ gv_cyan }{ gv_bold }Task:{ gv_reset } { iv_task }{ c_crlf }{ c_crlf }| ).
 
+    DATA(lo_amc) = zcl_pia_00_amc_listener=>new( ).
     DATA(lo_exec) = zcl_pia_00_executor=>new(
       io_llm      = go_llm
       io_registry = go_registry
       io_session  = go_session
-      io_listener = me ).
+      io_listener = lo_amc ).
 
     " stream tool events: check events before/after
     DATA(lv_ev_before) = lines( go_session->get_events( ) ).
