@@ -1,6 +1,6 @@
-# PIA — Pi-ABAP Agent
+# PIA — the Pi-ABAP Agent that writes itself
 
-**A coding agent written in ABAP, running inside SAP, that writes, activates and tests ABAP — including itself.**
+**A coding agent written in ABAP that runs inside SAP and reads, writes, activates and unit-tests ABAP classes, including its own.**
 
 You type a task into a terminal in your browser. PIA reads the class, writes the fix, activates it and runs
 its ABAP Unit tests — on the same system it runs in, through ADT, as you. ABAP is not only what PIA edits but
