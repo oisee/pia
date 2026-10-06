@@ -84,6 +84,13 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " Resume from checkpoint if provided
+    DATA(lv_checkpoint) = zcl_pia_00_json_util=>extract_str(
+      iv_json = iv_body iv_name = 'checkpoint' ).
+    IF lv_checkpoint IS NOT INITIAL.
+      go_session->from_json( zcl_pia_00_json_util=>unescape( lv_checkpoint ) ).
+    ENDIF.
+
     DATA(lo_exec) = zcl_pia_00_executor=>new(
       io_llm      = go_llm
       io_registry = go_registry
@@ -115,7 +122,12 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
       APPEND '{"tool":"' && ls_t-tool && '","ok":' && lv_ok && '}' TO lt_t.
     ENDLOOP.
     APPEND concat_lines_of( table = lt_t sep = ',' ) TO lt.
-    APPEND ']}' TO lt.
+    APPEND '],' TO lt.
+
+    " checkpoint for resume
+    APPEND '"checkpoint":"' &&
+           zcl_pia_00_json_util=>escape( go_session->to_json( ) ) &&
+           '"}' TO lt.
 
     rv_ = concat_lines_of( table = lt ).
   ENDMETHOD.
