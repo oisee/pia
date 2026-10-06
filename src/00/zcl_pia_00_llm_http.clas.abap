@@ -18,6 +18,12 @@ CLASS zcl_pia_00_llm_http DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING VALUE(rt_)  TYPE zif_pia_00_tool=>tt_calls.
 
   PRIVATE SECTION.
+    " next recorded response; the position is kept in <file>.pos so it survives turns run as jobs
+    METHODS replay
+      IMPORTING iv_file   TYPE string
+      EXPORTING ev_status TYPE i
+                ev_body   TYPE string
+                ev_error  TYPE string.
     DATA ms_config TYPE zif_pia_00_llm=>ts_config.
 
     METHODS build_input_items
@@ -158,21 +164,37 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
                 concat_lines_of( table = lt sep = ',' ) && ']' && lv_tools && '}'.
     ENDIF.
 
-    cl_http_client=>create_by_url(
-      EXPORTING url = ms_config-base_url
-      IMPORTING client = li ).
-    li->request->set_method( 'POST' ).
-    li->request->set_header_field( name = 'content-type' value = 'application/json' ).
-    IF ms_config-api_key IS NOT INITIAL.
-      DATA lv_auth TYPE string.
-      lv_auth = |Bearer { ms_config-api_key }|.
-      li->request->set_header_field( name = 'Authorization' value = lv_auth ).
+    " PIA_LLM=replay:<file> answers from a recorded transcript (no key, no network);
+    " PIA_LLM=record:<file> appends every response body to that file (one escaped body per line)
+    DATA(lv_mode) = zcl_pia_00_config=>get( `PIA_LLM` ).
+    IF lv_mode CP 'replay:*'.
+      replay( EXPORTING iv_file = substring_after( val = lv_mode sub = `:` )
+              IMPORTING ev_status = ev_status ev_body = ev_body ev_error = ev_error ).
+      IF ev_error IS NOT INITIAL.
+        RETURN.
+      ENDIF.
+    ELSE.
+      cl_http_client=>create_by_url(
+        EXPORTING url = ms_config-base_url
+        IMPORTING client = li ).
+      li->request->set_method( 'POST' ).
+      li->request->set_header_field( name = 'content-type' value = 'application/json' ).
+      IF ms_config-api_key IS NOT INITIAL.
+        DATA lv_auth TYPE string.
+        lv_auth = |Bearer { ms_config-api_key }|.
+        li->request->set_header_field( name = 'Authorization' value = lv_auth ).
+      ENDIF.
+      li->request->set_cdata( lv_body ).
+      li->send( ).
+      li->receive( ).
+      li->response->get_status( IMPORTING code = ev_status ).
+      ev_body = li->response->get_cdata( ).
+      IF lv_mode CP 'record:*' AND ev_status = 200.
+        zcl_pia_00_session_store=>append_line(
+          iv_file = substring_after( val = lv_mode sub = `:` )
+          iv_line = zcl_pia_00_json_util=>escape( ev_body ) ).
+      ENDIF.
     ENDIF.
-    li->request->set_cdata( lv_body ).
-    li->send( ).
-    li->receive( ).
-    li->response->get_status( IMPORTING code = ev_status ).
-    ev_body = li->response->get_cdata( ).
     DATA lv_resp TYPE string.
     lv_resp = ev_body.
     IF ev_status <> 200.
@@ -209,6 +231,25 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
     ELSE.
       ev_assistant_raw = ev_answer.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD replay.
+    DATA lv_pos TYPE i.
+    DATA(lt_pos) = zcl_pia_00_session_store=>read_lines( |{ iv_file }.pos| ).
+    READ TABLE lt_pos INDEX 1 INTO DATA(lv_pos_text).
+    IF sy-subrc = 0.
+      lv_pos = lv_pos_text.
+    ENDIF.
+    DATA(lt_rec) = zcl_pia_00_session_store=>read_lines( iv_file ).
+    lv_pos = lv_pos + 1.
+    READ TABLE lt_rec INDEX lv_pos INTO DATA(lv_line).
+    IF sy-subrc <> 0.
+      ev_error = |replay: no recorded response { lv_pos } in { iv_file } ({ lines( lt_rec ) } recorded)|.
+      RETURN.
+    ENDIF.
+    zcl_pia_00_session_store=>write_lines( iv_file = |{ iv_file }.pos| it_ = VALUE #( ( |{ lv_pos }| ) ) ).
+    ev_status = 200.
+    ev_body = zcl_pia_00_json_util=>unescape( lv_line ).
   ENDMETHOD.
 
 ENDCLASS.

@@ -21,7 +21,9 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND '<script>' TO lv.
     APPEND 'const APC="/sap/bc/apc/sap/zpia_tui";let ws,input="";' TO lv.
     APPEND 'const fit=new FitAddon.FitAddon();' TO lv.
-    APPEND 'const term=new Terminal({cursorBlink:true,fontSize:14,lineHeight:1.2,theme:{background:"#0d1117",foreground:"#c9d1d9",cursor:"#58a6ff"}});' TO lv.
+    " a font with emoji as fallback: the model's answers carry them
+    APPEND 'const FONT="\"DejaVu Sans Mono\",Menlo,Consolas,monospace,\"Noto Color Emoji\",\"Apple Color Emoji\",\"Segoe UI Emoji\"";' TO lv.
+    APPEND 'const term=new Terminal({cursorBlink:true,fontSize:14,lineHeight:1.2,fontFamily:FONT,theme:{background:"#0d1117",foreground:"#c9d1d9",cursor:"#58a6ff"}});' TO lv.
     APPEND 'term.loadAddon(fit);term.open(document.getElementById("terminal"));fit.fit();' TO lv.
     APPEND 'window.addEventListener("resize",()=>fit.fit());' TO lv.
     " Footer = the two live rows at the bottom: the status line (while a turn runs) and the input line.

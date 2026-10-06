@@ -23,9 +23,10 @@ CLASS zcl_pia_00_session_store DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_sid     TYPE string
       RETURNING VALUE(rv_) TYPE abap_bool.
 
-  PRIVATE SECTION.
+    " plain text files beside pia.env (also used for LLM record/replay)
     CLASS-METHODS write_lines IMPORTING iv_file TYPE string it_ TYPE string_table.
     CLASS-METHODS read_lines IMPORTING iv_file TYPE string RETURNING VALUE(rt_) TYPE string_table.
+    CLASS-METHODS append_line IMPORTING iv_file TYPE string iv_line TYPE string.
 
 ENDCLASS.
 
@@ -119,6 +120,19 @@ CLASS zcl_pia_00_session_store IMPLEMENTATION.
           ENDIF.
           APPEND lv_line TO rt_.
         ENDDO.
+        CLOSE DATASET iv_file.
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD append_line.
+    TRY.
+        OPEN DATASET iv_file FOR APPENDING IN TEXT MODE ENCODING UTF-8.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        TRANSFER iv_line TO iv_file.
         CLOSE DATASET iv_file.
       CATCH cx_root.
         RETURN.

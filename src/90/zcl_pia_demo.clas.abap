@@ -9,7 +9,7 @@ ENDCLASS.
 
 CLASS zcl_pia_demo IMPLEMENTATION.
   METHOD add.
-    rv_ = a - b.
+    rv_ = a + b.
   ENDMETHOD.
   METHOD selfcheck.
     IF zcl_pia_demo=>add( a = 2 b = 2 ) = 4.

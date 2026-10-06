@@ -9,9 +9,13 @@ const {chromium} = createRequire("/home/alice/dev/osg-pia/package.json")("playwr
 const here = dirname(fileURLToPath(import.meta.url));
 const base = process.argv[2] || "http://192.168.8.105:50000/sap/bc/zpia_tui/?sap-client=001";
 const langs = (process.argv[3] || "en,da,ru").split(",");
-const cfg = JSON.parse(readFileSync("/home/alice/dev/pia/.mcp.json", "utf8")).mcpServers["a4h-vsp"];
-const creds = {username: cfg.args[cfg.args.indexOf("--user") + 1], password: cfg.env.SAP_PASSWORD};
-const CLS = "ZCL_PIA_DEMO4";
+// credentials: PIA_E2E_USER/PIA_E2E_PASS, else the a4h-vsp entry of .mcp.json; class: PIA_E2E_CLASS
+let creds;
+if (process.env.PIA_E2E_USER) creds = {username: process.env.PIA_E2E_USER, password: process.env.PIA_E2E_PASS ?? ""};
+else { const cfg = JSON.parse(readFileSync("/home/alice/dev/pia/.mcp.json", "utf8")).mcpServers["a4h-vsp"];
+  creds = {username: cfg.args[cfg.args.indexOf("--user") + 1], password: cfg.env.SAP_PASSWORD}; }
+const CLS = process.env.PIA_E2E_CLASS || "ZCL_PIA_DEMO4";
+const SHOTS = process.env.PIA_E2E_SHOTS || "shots";
 const STEPS = {
   en: [["green", `Run the tests of ${CLS}.`, /pass|green|passed/i],
        ["break", `In ${CLS}, change add to a - b and activate it.`, /activat/i],
@@ -26,7 +30,7 @@ const STEPS = {
        ["red", `Запусти тесты ${CLS} ещё раз.`, /-1|1-|упал|fail|красн/i],
        ["fix", `Верни a + b, активируй и запусти тесты.`, /pass|green|зелён|прош|пройден|успешн/i]],
 };
-mkdirSync(join(here, "shots"), {recursive: true});
+mkdirSync(join(here, SHOTS), {recursive: true});
 const b = await chromium.launch({executablePath: "/home/alice/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"});
 let failed = 0;
 for (const lang of langs) {
@@ -50,7 +54,7 @@ for (const lang of langs) {
       await p.waitForFunction(() => st !== null, null, {timeout: 15000});
       await p.waitForFunction(() => st === null && queued.length === 0, null, {timeout: 180000});
     } catch (e) {
-      await p.screenshot({path: join(here, "shots", `${lang}-${n}-${step}-TIMEOUT.png`)});
+      await p.screenshot({path: join(here, SHOTS, `${lang}-${n}-${step}-TIMEOUT.png`)});
       console.log(`${lang} ${n} ${step} TIMEOUT; screen:\n${(await text()).slice(-1500)}`);
       failed++; break;
     }
@@ -58,7 +62,7 @@ for (const lang of langs) {
     const turn = (await text()).slice(mark);
     const ok = expect.test(turn);
     if (!ok) failed++;
-    await p.screenshot({path: join(here, "shots", `${lang}-${n}-${step}.png`)});
+    await p.screenshot({path: join(here, SHOTS, `${lang}-${n}-${step}.png`)});
     console.log(`${lang} ${n} ${step.padEnd(5)} ${ok ? "OK  " : "FAIL"} ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   }
   await ctx.close();

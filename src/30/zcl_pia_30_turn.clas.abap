@@ -90,15 +90,23 @@ CLASS zcl_pia_30_turn IMPLEMENTATION.
       rv_ = |JOB_OPEN failed ({ sy-subrc })|.
       RETURN.
     ENDIF.
-    CALL FUNCTION 'JOB_SUBMIT'
-      EXPORTING authcknam = sy-uname
-                jobcount  = lv_count
-                jobname   = lv_name
-                report    = 'ZPIA_TURN'
-      EXCEPTIONS OTHERS   = 1.
-    IF sy-subrc <> 0.
-      rv_ = |JOB_SUBMIT failed ({ sy-subrc })|.
-      RETURN.
+    IF zcl_pia_20_backend=>default( )->get_name( ) = `SAP-ADT`.
+      " SAP: no variant needed, the job finds its sid in its own name (GET_JOB_RUNTIME_INFO)
+      CALL FUNCTION 'JOB_SUBMIT'
+        EXPORTING authcknam = sy-uname
+                  jobcount  = lv_count
+                  jobname   = lv_name
+                  report    = 'ZPIA_TURN'
+        EXCEPTIONS OTHERS   = 1.
+      IF sy-subrc <> 0.
+        rv_ = |JOB_SUBMIT failed ({ sy-subrc })|.
+        RETURN.
+      ENDIF.
+    ELSE.
+      " open-steamgate: no GET_JOB_RUNTIME_INFO; the sid travels as a selection parameter
+      DATA lv_sid TYPE c LENGTH 26.
+      lv_sid = iv_sid.
+      SUBMIT zpia_turn WITH p_sid = lv_sid VIA JOB lv_name NUMBER lv_count AND RETURN.
     ENDIF.
     CALL FUNCTION 'JOB_CLOSE'
       EXPORTING jobcount  = lv_count
