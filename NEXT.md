@@ -1,5 +1,5 @@
 # Следующий шаг PIA
-1. ЧАТ-UX: H1 только EN + индикатор 'думает...' при отправке; затем TUI/terminal via APC + стриминг (порт $ZLLM_05)
+1. TUI/terminal via APC + стриминг (порт $ZLLM_05 -> zcl_pia_30_f_tui): APC-хендлер + xterm.js, подписка на event log сессии; до стриминга LLM — стрим тул-событий. (ЧАТ-UX: EN-H1 + thinking — СДЕЛАНО 2026-10-06)
    a) ADT-create probe-класса ZPIA_P2A_PROBE на 8091 (POST /oo/classes, формат — из adt-тестов vscode/c2a)
    b) probe (phase-машина по store OBJECT): нет объекта → STORE CREATE (CLAS, IV_JSON={"package":"$TMP","description":"..."}, source=красный selfcheck); есть+красный → WRITE зелёный; зелёный → DELETE
    c) между фазами: внешний ADT-activate + GET ?version=active + classrun disposable (RED→GREEN) + 404 после DELETE
@@ -19,3 +19,17 @@
 
 ## ✅ P2a ПРИНЯТА (2026-10-06): CREATE→RED→green→GREEN→DELETE→404 на :8091
 STORE CREATE/DELETE из ABAP работают по контракту; после рестарта 8091 с JSON CHECK/ACTIVATE — включится ветка моего адаптера (active/issues из EV_JSON).
+
+## P3a wire contract (draft коллеги, 2026-10-06) — основа zif_pia_20_dev_backend v2
+- ACTIVATE JSON: state/op_id/generation_id + active/live/note/issues + type/name/created_at/updated_at/failure_stage
+- Lookup: STORE ACTIVATION_STATUS IV_JSON={op_id} — тот же документ, read-only; unknown/expired -> NOT_FOUND
+- Retention: terminal >=24h; pending жив пока host; журнал вне serving child; parent restart: unfinished->failed/recovery (без ложного published)
+- Реализация в docs/abap-development-api.md секция 'P3a wire contract'
+- P3a-уточнения (review): op_id даже при refusal (refusal->failed сразу); checked=промежуточный; CHECK без op; completed_at терминально-иммутабельно; published историчен -> RUN_TESTS сверяет expected_generation и явно отказывает; решение о тестах по state=published (не active/live)
+- P3a impl (2026-10-06): журнал + ACTIVATION_STATUS, pending->published/failed, recovery, >=24h retention, 10 focused PASS (гонки владения/IPC и потеря op_id закрыты ревью). SCOPE: lookup на ТОТ ЖЕ порт source-host; журнал по root+HTTP-port; второй владелец отказывается. На 8091 ещё не загружен — жду live GO.
+- P3a: LIVE_GO получен, механизм доказан коллегой из ABAP. МОЙ probe (zpia_p3a_probe) не публикуется: ACT=200 -> 'not built' — прогнать CHECKRUN источника, найти отказ. Адаптер на op_id готов к подключению.
+
+## A2A + MCP (2026-10-06, от Alice)
+- $ZPIA_30: A2A handler (порт zcl_llm_00_a2a_handler) — PIA как A2A-сервер: внешний агент (Claude/Copilot) даёт задачу, PIA выполняет тулами в SAP/OSG
+- $ZPIA_30: A2A client (порт zcl_llm_00_a2a_client) — PIA зовёт внешних агентов для подзадач
+- MCP: потом, через a2a-mcp-server bridge
