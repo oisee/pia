@@ -61,7 +61,11 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
     mo_session->push_message( iv_role = 'user' iv_content = iv_task ).
     mo_session->evt( 'session_start' ).
 
-    WHILE mo_session->mv_iterations < iv_max_iterations.
+    " the iteration limit is per turn; the session keeps the running total
+    DATA lv_iter TYPE i.
+    DATA(lv_tools0) = mo_session->mv_tool_calls.
+    WHILE lv_iter < iv_max_iterations.
+      lv_iter = lv_iter + 1.
       mo_session->inc_iteration( ).
 
       mo_llm->chat(
@@ -86,8 +90,8 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
         fire( iv_type = 'answer' iv_data = lv_answer ).
         rs_-answer = lv_answer.
         rs_-ok = abap_true.
-        rs_-iterations = mo_session->mv_iterations.
-        rs_-tool_calls = mo_session->mv_tool_calls.
+        rs_-iterations = lv_iter.
+        rs_-tool_calls = mo_session->mv_tool_calls - lv_tools0.
         mo_session->push_message( iv_role = 'assistant' iv_content = lv_answer ).
         mo_session->evt( 'turn_complete' ).
         RETURN.
@@ -124,8 +128,8 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
 
     rs_-ok = abap_true.
     rs_-answer = 'MAX ITERATIONS REACHED'.
-    rs_-iterations = mo_session->mv_iterations.
-    rs_-tool_calls = mo_session->mv_tool_calls.
+    rs_-iterations = lv_iter.
+    rs_-tool_calls = mo_session->mv_tool_calls - lv_tools0.
   ENDMETHOD.
 
 ENDCLASS.

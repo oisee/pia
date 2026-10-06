@@ -28,7 +28,7 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     DATA mv_started TYPE abap_bool.
     DATA mv_bound   TYPE abap_bool.   " AMC consumer bound: tool events arrive live
 
-    CLASS-DATA go_session  TYPE REF TO zcl_pia_00_session.
+    DATA mo_session TYPE REF TO zcl_pia_00_session.   " one conversation per connection
     CLASS-DATA go_registry TYPE REF TO zcl_pia_00_registry.
     CLASS-DATA go_llm      TYPE REF TO zif_pia_00_llm.
 
@@ -115,7 +115,10 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD boot.
-    IF go_session IS BOUND. RETURN. ENDIF.
+    IF mo_session IS NOT BOUND.
+      mo_session = zcl_pia_00_session=>new( 'tui' ).
+    ENDIF.
+    IF go_registry IS BOUND. RETURN. ENDIF.
     DATA(lo_backend) = zcl_pia_20_b_osg_store=>new( ).
     go_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
@@ -124,7 +127,6 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
       model    = zcl_pia_00_config=>model( )
       api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
-    go_session = zcl_pia_00_session=>new( 'tui' ).
   ENDMETHOD.
 
   METHOD run_task.
@@ -134,11 +136,11 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     DATA(lo_exec) = zcl_pia_00_executor=>new(
       io_llm      = go_llm
       io_registry = go_registry
-      io_session  = go_session
+      io_session  = mo_session
       io_listener = lo_amc ).
 
     " stream tool events: check events before/after
-    DATA(lv_ev_before) = lines( go_session->get_events( ) ).
+    DATA(lv_ev_before) = lines( mo_session->get_events( ) ).
 
     DATA(ls_result) = lo_exec->run(
       iv_task = iv_task
@@ -153,7 +155,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     IF mv_bound = abap_true AND lo_amc->is_streaming( ) = abap_true.
       CLEAR lv_ev_before.
     ELSE.
-    LOOP AT go_session->get_trace( ) INTO DATA(ls_t).
+    LOOP AT mo_session->get_trace( ) INTO DATA(ls_t).
       DATA(lv_status) = COND string( WHEN ls_t-ok = abap_true THEN |{ gv_green }ok{ gv_reset }|
                                      ELSE |{ gv_red }FAIL{ gv_reset }| ).
       send( |  { gv_dim }[{ ls_t-tool }] { lv_status }: { ls_t-args }{ gv_reset }{ c_crlf }| ).
