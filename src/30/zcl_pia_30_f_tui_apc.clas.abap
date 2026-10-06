@@ -38,6 +38,8 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     METHODS send IMPORTING iv_text TYPE string.
     METHODS read_sid IMPORTING io_context TYPE REF TO if_apc_wsp_server_context.
     METHODS start_turn IMPORTING iv_task TYPE string.
+    METHODS replay IMPORTING it_ TYPE zif_pia_00_llm=>tt_messages.
+    CONSTANTS c_replay_max TYPE i VALUE 20.
 
 ENDCLASS.
 
@@ -105,13 +107,40 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
         send( |{ gv_red }live events off: { lx_bind->get_text( ) }{ gv_reset }{ c_crlf }| ).
     ENDTRY.
 
-    DATA(lv_earlier) = lines( zcl_pia_00_session_store=>load( mv_sid )->get_messages( ) ).
+    DATA(lt_earlier) = zcl_pia_00_session_store=>load( mv_sid )->get_messages( ).
+    DATA(lv_earlier) = lines( lt_earlier ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }Tools: read/write/activate/run_tests · backend { mv_backend } · turns { mv_mode }|
        && | · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }session { mv_sid }{ COND string( WHEN lv_earlier > 0 THEN | · resumed, { lv_earlier } earlier messages| ) }|
        && | · /new starts a fresh one{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }Type a task and press Enter{ gv_reset }{ c_crlf }{ c_crlf }| ).
+    replay( lt_earlier ).
+  ENDMETHOD.
+
+  METHOD replay.
+    " a resumed session shows its conversation again: the user's tasks and the final answers
+    " (system prompt, tool calls and tool results stay hidden), the last c_replay_max of them
+    DATA lt_shown TYPE string_table.
+    DATA lv_out TYPE string.
+    LOOP AT it_ INTO DATA(ls).
+      IF ls-role = 'user'.
+        APPEND |{ gv_cyan }> { gv_reset }{ ls-content }| TO lt_shown.
+      ELSEIF ls-role = 'assistant' AND ls-content IS NOT INITIAL AND ls-content NP '{"tool_calls"*'.
+        APPEND |{ c_crlf }{ gv_green }{ ls-content }{ gv_reset }{ c_crlf }| TO lt_shown.
+      ENDIF.
+    ENDLOOP.
+    DATA(lv_skip) = lines( lt_shown ) - c_replay_max.
+    IF lv_skip > 0.
+      lv_out = |{ gv_dim }… { lv_skip } earlier lines not shown{ gv_reset }{ c_crlf }|.
+      DELETE lt_shown TO lv_skip.
+    ENDIF.
+    LOOP AT lt_shown INTO DATA(lv_line).
+      lv_out = lv_out && lv_line && c_crlf.
+    ENDLOOP.
+    IF lv_out IS NOT INITIAL.
+      send( lv_out && |{ gv_dim }───{ gv_reset }{ c_crlf }{ c_crlf }| ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_message.
