@@ -29,7 +29,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     mo_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
       model    = 'glm-5.3-flash'
-      api_key  = 'PIA_ZAI_KEY'
+      api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
     mo_session = zcl_pia_00_session=>new( 'chat' ).
   ENDMETHOD.

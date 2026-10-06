@@ -73,6 +73,8 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
           iv_json = ls-json iv_name = 'generation_id' ).
         rs_-issues = zcl_pia_00_json_util=>extract_balanced(
           iv_json = ls-json iv_key = 'issues' iv_open = '[' iv_close = ']' ).
+        rs_-failure_stage = zcl_pia_00_json_util=>extract_str(
+          iv_json = ls-json iv_name = 'failure_stage' ).
 
         " state=published or no refusal = ok
         IF rs_-state = 'failed' OR
@@ -101,10 +103,21 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
         rs_-op_id = iv_op_id.
         rs_-generation_id = zcl_pia_00_json_util=>extract_str(
           iv_json = ls-json iv_name = 'generation_id' ).
+        rs_-failure_stage = zcl_pia_00_json_util=>extract_str(
+          iv_json = ls-json iv_name = 'failure_stage' ).
+        rs_-issues = zcl_pia_00_json_util=>extract_balanced(
+          iv_json = ls-json iv_key = 'issues' iv_open = '[' iv_close = ']' ).
         rs_-ok = xsdbool( rs_-state = 'published' ).
       CATCH cx_root INTO DATA(lx).
+        " unknown/expired op_id is NOT_FOUND, not a backend error
         rs_-ok = abap_false.
-        rs_-state = 'error'.
+        rs_-op_id = iv_op_id.
+        rs_-issues = lx->get_text( ).
+        IF rs_-issues CS 'not found'.
+          rs_-state = 'not_found'.
+        ELSE.
+          rs_-state = 'error'.
+        ENDIF.
     ENDTRY.
   ENDMETHOD.
 

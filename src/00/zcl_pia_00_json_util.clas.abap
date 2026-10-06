@@ -84,12 +84,16 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD to_hex4.
-    DATA lv TYPE string.
-    lv = iv_.
-    " 4-digit uppercase hex
-    DATA(lv_h) = to_upper( |{ iv_ }| ).
-    DATA(lv_pad) = '0000' && lv_h.
-    rv_ = substring( val = lv_pad off = strlen( lv_pad ) - 4 len = 4 ).
+    " 4-digit uppercase hex (was decimal: 1046 -> '1046' instead of '0416')
+    CONSTANTS c_hex TYPE string VALUE `0123456789ABCDEF`.
+    DATA lv_n TYPE i.
+    DATA lv_d TYPE i.
+    lv_n = iv_.
+    DO 4 TIMES.
+      lv_d = lv_n MOD 16.
+      rv_ = substring( val = c_hex off = lv_d len = 1 ) && rv_.
+      lv_n = lv_n DIV 16.
+    ENDDO.
   ENDMETHOD.
 
   METHOD hexval.

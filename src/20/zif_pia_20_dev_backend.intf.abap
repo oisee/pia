@@ -11,6 +11,7 @@ INTERFACE zif_pia_20_dev_backend PUBLIC.
            op_id         TYPE string,
            generation_id TYPE string,
            issues        TYPE string,   " JSON array
+           failure_stage TYPE string,   " validation|step|build|promotion|revision|recovery
            ok            TYPE abap_bool,
          END OF ts_activation.
 

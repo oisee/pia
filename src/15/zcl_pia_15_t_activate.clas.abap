@@ -41,12 +41,12 @@ CLASS zcl_pia_15_t_activate IMPLEMENTATION.
     ENDIF.
     DATA(ls_act) = mo_backend->activate( lv_name ).
     IF ls_act-ok = abap_false.
-      rs_ = fail( 'activation refused: ' && ls_act-issues ).
+      rs_ = fail( |activation refused: { ls_act-issues }| ).
       RETURN.
     ENDIF.
     " Include op_id for checkpoint/resume tracking
     DATA lv_out TYPE string.
-    lv_out = 'activated: ' && lv_name.
+    lv_out = |activated: { lv_name }|.
     IF ls_act-op_id IS NOT INITIAL.
       lv_out = lv_out && ' op_id=' && ls_act-op_id.
     ENDIF.

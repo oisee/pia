@@ -21,6 +21,7 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     CLASS-DATA gv_red   TYPE string.
     CLASS-DATA gv_bold  TYPE string.
     CLASS-DATA gv_reset TYPE string.
+    CLASS-DATA gv_done  TYPE string.  " OSC marker: turn finished (stops the client status line)
 
     DATA mo_msg_mgr TYPE REF TO if_apc_wsp_message_manager.
     DATA mv_running TYPE abap_bool.
@@ -48,6 +49,8 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     gv_red    = gv_esc && '[31m'.
     gv_bold   = gv_esc && '[1m'.
     gv_reset  = gv_esc && '[0m'.
+    lv_xstr = '07'.
+    gv_done   = gv_esc && ']777;pia-done' && cl_abap_conv_codepage=>create_in( )->convert( source = lv_xstr ).
   ENDMETHOD.
 
   METHOD if_apc_wsp_extension~on_accept.
@@ -84,16 +87,19 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
           RETURN.
         ENDIF.
         run_task( lv_input ).
-      CATCH cx_apc_error.
+      CATCH cx_root INTO DATA(lx).
+        mv_running = abap_false.
+        send( |{ c_crlf }{ gv_red }ERROR: { lx->get_text( ) }{ gv_reset }{ c_crlf }| ).
     ENDTRY.
+    send( gv_done ).
   ENDMETHOD.
 
   METHOD zif_pia_00_listener~on_event.
     CASE iv_type.
       WHEN 'tool_start'.
-        send( gv_dim && '  > ' && iv_data && gv_reset && c_crlf ).
+        send( gv_dim && `  > ` && iv_data && gv_reset && c_crlf ).
       WHEN 'tool_done'.
-        send( gv_green && '  < ' && iv_data && gv_reset && c_crlf ).
+        send( gv_green && `  < ` && iv_data && gv_reset && c_crlf ).
       WHEN 'answer'.
         send( c_crlf && gv_green && iv_data && gv_reset && c_crlf ).
     ENDCASE.
@@ -121,7 +127,7 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
     go_llm = zcl_pia_00_llm_http=>new( VALUE #(
       base_url = 'https://api.z.ai/api/v1/responses'
       model    = 'glm-5.3-flash'
-      api_key  = 'PIA_ZAI_KEY'
+      api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
       api_type = 'responses' ) ).
     go_session = zcl_pia_00_session=>new( 'tui' ).
   ENDMETHOD.
@@ -151,8 +157,8 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
 
     " stream tool trace
     LOOP AT go_session->get_trace( ) INTO DATA(ls_t).
-      DATA(lv_status) = COND #( WHEN ls_t-ok = abap_true THEN '{ gv_green }ok{ gv_reset }'
-                                ELSE '{ gv_red }FAIL{ gv_reset }' ).
+      DATA(lv_status) = COND string( WHEN ls_t-ok = abap_true THEN |{ gv_green }ok{ gv_reset }|
+                                     ELSE |{ gv_red }FAIL{ gv_reset }| ).
       send( |  { gv_dim }[{ ls_t-tool }] { lv_status }: { ls_t-args }{ gv_reset }{ c_crlf }| ).
     ENDLOOP.
 

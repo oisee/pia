@@ -3,8 +3,6 @@ CLASS zcl_pia_00_llm_http DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     INTERFACES zif_pia_00_llm.
 
-    CLASS-DATA sv_dbg_url  TYPE string READ-ONLY.
-    CLASS-DATA sv_dbg_auth TYPE string READ-ONLY.
 
     CLASS-METHODS new
       IMPORTING is_config   TYPE zif_pia_00_llm=>ts_config
@@ -212,10 +210,6 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
       DATA lv_auth TYPE string.
       lv_auth = |Bearer { ms_config-api_key }|.
       li->request->set_header_field( name = 'Authorization' value = lv_auth ).
-      sv_dbg_url = ms_config-base_url.
-      sv_dbg_auth = 'len=' && strlen( ms_config-api_key ) &&
-                    ' head=' && ms_config-api_key+0(6) &&
-                    ' tail=' && substring( val = ms_config-api_key off = strlen( ms_config-api_key ) - 4 ).
     ENDIF.
     li->request->set_cdata( lv_body ).
     li->send( ).
@@ -225,7 +219,7 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
     DATA lv_resp TYPE string.
     lv_resp = ev_body.
     IF ev_status <> 200.
-      ev_error = 'HTTP ' && ev_status && ': ' && lv_resp.
+      ev_error = |HTTP { ev_status }: { lv_resp }|.
       RETURN.
     ENDIF.
 

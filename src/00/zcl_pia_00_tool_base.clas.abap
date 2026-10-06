@@ -54,7 +54,7 @@ CLASS zcl_pia_00_tool_base IMPLEMENTATION.
 
   METHOD fail.
     rs_-ok = abap_false.
-    rs_-output = 'ERROR: ' && iv_msg.
+    rs_-output = |ERROR: { iv_msg }|.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_params.

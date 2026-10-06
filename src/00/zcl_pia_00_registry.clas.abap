@@ -63,7 +63,7 @@ CLASS zcl_pia_00_registry IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     rs_-ok = abap_false.
-    rs_-output = 'ERROR: tool not found: ' && is_call-name.
+    rs_-output = |ERROR: tool not found: { is_call-name }|.
     rs_-call_id = is_call-id.
   ENDMETHOD.
 

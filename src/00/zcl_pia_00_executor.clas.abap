@@ -98,7 +98,7 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
       LOOP AT lt_calls INTO DATA(ls_call).
         mo_session->inc_tool_call( ).
         mo_session->evt( |tool_started { ls_call-name }| ).
-        fire( iv_type = 'tool_start' iv_data = ls_call-name && ' ' && ls_call-arguments ).
+        fire( iv_type = 'tool_start' iv_data = |{ ls_call-name } { ls_call-arguments }| ).
 
         DATA(ls_result) = mo_registry->invoke_call( ls_call ).
 
