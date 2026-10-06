@@ -22,7 +22,7 @@ npm run -s transpiler:pin                      # without it OSD_WARM=1 says "war
 npm run -s packs:fetch
 OSG="$DIR" "$PIA/osg-probe/deploy-osg-pia.sh"
 LOG=${LOG:-$DIR/.local/osg-pia.log}
-setsid nohup env OSD_HEAVY_RANGE="$RANGE" OSD_HEAVY_SLOTS=3 OSD_ADT_ONE_RUNTIME=1 OSD_WARM=1 \
+setsid nohup env OSD_HEAVY_RANGE="$RANGE" OSD_HEAVY_SLOTS=3 OSD_ADT_ONE_RUNTIME=1 OSD_WARM=1 OSD_WARM_QUIET_MS=86400000 \
   OSD_DATASET_READ="$HOME/.config/pia" OSD_DATASET_WRITE="$HOME/.config/pia" OSD_DATASET_HOME="$HOME/.config/pia" \
   bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-127.0.0.1} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
 echo "starting; log: $LOG (the port is in its first line, e.g. STG_PORT=8021); first build takes a few minutes"

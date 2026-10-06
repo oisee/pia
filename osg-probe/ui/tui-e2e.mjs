@@ -17,6 +17,7 @@ else { const cfg = JSON.parse(readFileSync("/home/alice/dev/pia/.mcp.json", "utf
   creds = {username: cfg.args[cfg.args.indexOf("--user") + 1], password: cfg.env.SAP_PASSWORD}; }
 const CLS = process.env.PIA_E2E_CLASS || "ZCL_PIA_DEMO4";
 const SHOTS = process.env.PIA_E2E_SHOTS || "shots";
+const SETTLE = Number(process.env.PIA_E2E_SETTLE || 0);
 const STEPS = {
   en: [["green", `Run the tests of ${CLS}.`, /pass|green|passed/i],
        ["break", `In ${CLS}, change add to a - b and activate it.`, /activat/i],
@@ -64,10 +65,14 @@ for (const lang of langs) {
     }
     await p.waitForTimeout(400);
     const turn = (await text()).slice(mark);
-    const ok = expect.test(turn);
+    // a dropped connection ends the turn too, and the replayed history can then match: count it as a failure
+    const ok = expect.test(turn) && !/Disconnected/.test(turn);
     if (!ok) failed++;
     await p.screenshot({path: join(here, SHOTS, `${lang}-${n}-${step}.png`)});
     console.log(`${lang} ${n} ${step.padEnd(5)} ${ok ? "OK  " : "FAIL"} ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    // open-steamgate publishes an activation after the turn and swaps the runtime, which drops the
+    // WebSocket; a person types slower than that, the test waits (PIA_E2E_SETTLE ms, 0 on SAP)
+    if (SETTLE && (step === "break" || step === "fix")) await p.waitForTimeout(SETTLE);
   }
   await ctx.close();
 }

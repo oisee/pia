@@ -25,16 +25,17 @@ GREEN: 1 passed, 0 failed
 
 | | |
 |---|---|
-| **Terminal** | xterm.js over an ABAP Push Channel: live tool events (over AMC), a status line while the agent works, type-ahead with a queue, Up/Down history, copy on select, Ctrl+V |
+| **Terminal** | xterm.js over an ABAP Push Channel: live tool events (over AMC), a status line while the agent works, type-ahead with a queue, Up/Down history, copy on select, Ctrl+V, Ctrl+A |
 | **Agent loop** | `read_object` · `write_source` (main or `testclasses`) · `activate` · `run_tests`; up to 8 steps per turn; answers in the language you write in |
-| **Sessions** | conversations survive reconnects and reloads (`/new` starts a fresh one) |
+| **Sessions** | conversations survive reconnects and reloads and are shown again on resume (`/new` starts a fresh one) |
 | **SAP backend** | ADT REST on the same system via `cl_http_client=>create_internal` — your user, no password, local (`$…`) packages only |
 | **Turns off the push channel** | SAP forbids ABAP Unit and source writes inside an APC handler, so each turn runs as a background job `PIA_<session>` and streams back over AMC |
-| **LLM** | z.ai `glm-5.3` (Responses API), configurable |
+| **LLM** | z.ai `glm-5.3` (Responses API), configurable; record and replay a run without a key (`PIA_LLM`) |
 | **Also** | HTML chat `/sap/bc/zpia_chat/`, an A2A endpoint `/sap/bc/zpia_a2a/`, an MCP bridge for Claude Code (`mcp/`) |
 
 Tested end to end with Playwright in **English, Danish and Russian** (`osg-probe/ui/tui-e2e.mjs`): tests green →
-break `add` → tests red → fix → tests green, 12/12 steps on SAP NetWeaver 7.58 (A4H).
+break `add` → tests red → fix → tests green, five turns per language, 15/15 on SAP NetWeaver 7.58 (A4H) and
+15/15 on open-steamgate.
 
 | English | Dansk | Русский |
 |---|---|---|
@@ -42,9 +43,9 @@ break `add` → tests red → fix → tests green, 12/12 steps on SAP NetWeaver 
 
 ## Install on SAP (7.58, tested on the ABAP Platform Trial A4H)
 
-1. **Import the package.** Download `pia-v0.1.0-abapgit.zip` from the release and import it with abapGit
+1. **Import the package.** Download `pia-v0.1.1-abapgit.zip` from the release and import it with abapGit
    (offline repository) into a new local package `$ZPIA`. With vsp:
-   `vsp git import-zip pia-v0.1.0-abapgit.zip --package '$ZPIA'`.
+   `vsp git import-zip pia-v0.1.1-abapgit.zip --package '$ZPIA'`.
 2. **Trust z.ai.** In STRUST add *USERTrust RSA Certification Authority* and *Sectigo Public Server
    Authentication Root R46* to *SSL client Anonymous* and *SSL client Standard*.
 3. **Give PIA a key.** Put a file `pia.env` into the instance's `DIR_HOME` (A4H: `/usr/sap/A4H/D00/work`),
@@ -57,14 +58,28 @@ break `add` → tests red → fix → tests green, 12/12 steps on SAP NetWeaver 
 4. **Open the terminal:** `http://<host>:<port>/sap/bc/zpia_tui/?sap-client=<client>` and log on.
    The banner should say `backend SAP-ADT · turns job · live events on`.
 
-PIA keeps its conversations as `pia-session-<id>.txt` next to `pia.env`.
+PIA keeps its conversations as `pia-session-<id>.txt` next to `pia.env`. Settings without secrets can go into
+`pia-settings.env` in the same directory.
+
+### Record and replay
+
+`PIA_LLM=record:<file>` in `pia-settings.env` appends every LLM response to `<file>`; `PIA_LLM=replay:<file>`
+answers from it instead of calling the LLM, in the same order (the position is kept in `<file>.pos`; delete it
+to start over). A replayed run needs no key and no network. The release carries `pia-chapter.rec`, the
+three-language scenario of the e2e test recorded on open-steamgate.
 
 ## On open-steamgate (preview)
 
 PIA also runs on [open-steamgate](https://github.com/oisee/open-steamgate), the open ABAP runtime, with an
 in-process backend (STORE): tracked activation (`op_id` → `published`), `RUN_TESTS` on a pinned generation,
-warm publishing in ~2.6 s. In 0.1 this needs the development-API branch of open-steamgate
-([#626](https://github.com/oisee/open-steamgate/pull/626)); 0.1.1 will follow once it is on `main`.
+warm publishing in ~2.6 s. The development API ([#626](https://github.com/oisee/open-steamgate/pull/626)) is on
+`main`. The terminal needs two more open-steamgate changes that are not merged yet: AMC channel extensions
+([#630](https://github.com/oisee/open-steamgate/pull/630)) and publishing at the end of an APC step.
+
+`osg-probe/osg-setup.sh` clones open-steamgate, pins the transpiler, deploys PIA and starts it; `osg-run.sh`
+restarts it with background jobs. On open-steamgate a turn runs inline, and an activation goes live when the
+turn ends, so run the tests in the next turn. On a fresh database activate `ZCL_PIA_DEMO` once (or let PIA do
+it) before the first test run.
 
 ## How it is built
 
@@ -94,7 +109,9 @@ Fixing a real bug in itself without a human prompt per step is the goal after 0.
 - Writes only to classes that already exist, and only in local packages (`$…`).
 - One turn at a time per session; there is no way to cancel a running turn yet.
 - The daemon turn mode (a pre-started ABAP daemon fed over AMC) does not pick up turns yet: use `job`.
-- open-steamgate support is a preview until #626 is merged.
+- On open-steamgate the terminal is a preview until #630 and the APC step boundary are merged. A warm runtime
+  recycle drops open push channels, also in the middle of a turn; the scripts set `OSD_WARM_QUIET_MS` to a day
+  so that the most frequent trigger (a quiet minute) does not fire.
 
 What comes next is in [`docs/SUPER-BACKLOG.md`](docs/SUPER-BACKLOG.md).
 
