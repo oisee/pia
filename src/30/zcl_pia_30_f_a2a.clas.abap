@@ -108,8 +108,11 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
     APPEND '"trace":[' TO lt.
     DATA lt_t TYPE string_table.
     LOOP AT go_session->get_trace( ) INTO DATA(ls_t).
-      APPEND '{"tool":"' && ls_t-tool && '","ok":' &&
-             COND #( WHEN ls_t-ok = abap_true THEN 'true' ELSE 'false' ) && '}' TO lt_t.
+      DATA(lv_ok) = 'false'.
+      IF ls_t-ok = abap_true.
+        lv_ok = 'true'.
+      ENDIF.
+      APPEND '{"tool":"' && ls_t-tool && '","ok":' && lv_ok && '}' TO lt_t.
     ENDLOOP.
     APPEND concat_lines_of( table = lt_t sep = ',' ) TO lt.
     APPEND ']}' TO lt.
