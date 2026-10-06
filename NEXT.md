@@ -1,5 +1,5 @@
 # Следующий шаг PIA (обновлено 2026-10-06 04:00)
-
+M2: checkpoint/resume под P3a (op_id/generation_id) — ядро для устойчивого self-hosting
 ## ✅ ЗАКРЫТО (эта сессия)
 - M0: LLM из ABAP в OSG
 - M1: Агентный цикл (read→write→activate→verify PASS)
