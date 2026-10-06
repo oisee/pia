@@ -26,6 +26,7 @@ CLASS zcl_pia_30_f_tui_apc DEFINITION
     DATA mo_msg_mgr TYPE REF TO if_apc_wsp_message_manager.
     DATA mv_running TYPE abap_bool.
     DATA mv_started TYPE abap_bool.
+    DATA mv_bound   TYPE abap_bool.   " AMC consumer bound: tool events arrive live
 
     CLASS-DATA go_session  TYPE REF TO zcl_pia_00_session.
     CLASS-DATA go_registry TYPE REF TO zcl_pia_00_registry.
@@ -67,13 +68,15 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
         lo_binding->bind_amc_message_consumer(
           i_application_id = 'ZPIA_AMC'
           i_channel_id     = '/events' ).
-      CATCH cx_root.
-        " AMC optional — fallback to post-fact streaming
+        mv_bound = abap_true.
+      CATCH cx_root INTO DATA(lx_bind).
+        mv_bound = abap_false.
+        send( |{ gv_red }live events off: { lx_bind->get_text( ) }{ gv_reset }{ c_crlf }| ).
     ENDTRY.
 
     boot( ).
     send( |{ gv_bold }{ gv_cyan }PIA - pi, writing itself in ABAP{ gv_reset }{ c_crlf }| ).
-    send( gv_dim && 'Tools: read/write/activate/run_tests' && gv_reset && c_crlf ).
+    send( |{ gv_dim }Tools: read/write/activate/run_tests · live events { COND string( WHEN mv_bound = abap_true THEN `on` ELSE `off` ) }{ gv_reset }{ c_crlf }| ).
     send( |{ gv_dim }Type a task and press Enter{ gv_reset }{ c_crlf }{ c_crlf }| ).
   ENDMETHOD.
 
@@ -126,7 +129,6 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
 
   METHOD run_task.
     mv_running = abap_true.
-    send( |{ c_crlf }{ gv_cyan }{ gv_bold }Task:{ gv_reset } { iv_task }{ c_crlf }{ c_crlf }| ).
 
     DATA(lo_amc) = zcl_pia_00_amc_listener=>new( ).
     DATA(lo_exec) = zcl_pia_00_executor=>new(
@@ -147,12 +149,16 @@ CLASS zcl_pia_30_f_tui_apc IMPLEMENTATION.
       iv_max_iterations = 8
       iv_continue = abap_true ).
 
-    " stream tool trace
+    " post-fact tool trace, only when events did not arrive live
+    IF mv_bound = abap_true AND lo_amc->is_streaming( ) = abap_true.
+      CLEAR lv_ev_before.
+    ELSE.
     LOOP AT go_session->get_trace( ) INTO DATA(ls_t).
       DATA(lv_status) = COND string( WHEN ls_t-ok = abap_true THEN |{ gv_green }ok{ gv_reset }|
                                      ELSE |{ gv_red }FAIL{ gv_reset }| ).
       send( |  { gv_dim }[{ ls_t-tool }] { lv_status }: { ls_t-args }{ gv_reset }{ c_crlf }| ).
     ENDLOOP.
+    ENDIF.
 
     send( |{ c_crlf }{ gv_green }{ ls_result-answer }{ gv_reset }{ c_crlf }{ c_crlf }| ).
     send( |{ gv_dim }iters={ ls_result-iterations } tools={ ls_result-tool_calls }{ gv_reset }{ c_crlf }| ).
