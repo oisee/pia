@@ -13,6 +13,9 @@ Ideas after 0.1, not yet ordered or promised. Grouped by theme; each line is a s
 - **Create classes on SAP** (ADT create), and transportable packages with an explicit transport.
 - open-steamgate from `main` once #626 is merged (0.1.1); P4 warm create for new objects.
 - Clean up on A4H: nested SICF nodes left by early installs.
+- **LLM record / replay** (`PIA_LLM=record:<file>` / `replay:<file>`, on top of zcl_pia_00_llm_mock): deterministic
+  runs without a key, for the osg-demo book chapter and for CI; a recorded transcript in the release.
+- abapGit import skipped ZCL_PIA_30_F_TUI_APC in the v0.1.0 zip (decision "add", no error): find out why.
 
 ## Tools like ZLLM
 
