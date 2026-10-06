@@ -1,11 +1,8 @@
 CLASS zcl_pia_00_session DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
-    TYPES: BEGIN OF ts_message,
-             role    TYPE string,
-             content TYPE string,
-           END OF ts_message.
-    TYPES tt_messages TYPE STANDARD TABLE OF ts_message WITH EMPTY KEY.
+    TYPES ts_message TYPE zif_pia_00_llm=>ts_message.
+    TYPES tt_messages TYPE zif_pia_00_llm=>tt_messages.
 
     TYPES: BEGIN OF ts_trace,
              tool   TYPE string,
@@ -136,7 +133,7 @@ CLASS zcl_pia_00_session IMPLEMENTATION.
     DATA(lv_msgs) = zcl_pia_00_json_util=>extract_balanced(
       iv_json = iv_json iv_key = 'messages' iv_open = '[' iv_close = ']' ).
     DATA lt TYPE string_table.
-    lt = zcl_pia_00_llm_http=>split_entries( lv_msgs ).
+    lt = zcl_pia_00_json_util=>split_entries( lv_msgs ).
     LOOP AT lt INTO DATA(lv_e).
       APPEND VALUE #(
         role = zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'role' )

@@ -30,6 +30,11 @@ CLASS zcl_pia_00_json_util DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_        TYPE string
       RETURNING VALUE(rv_) TYPE string.
 
+    " top-level {...} entries of a JSON array string
+    CLASS-METHODS split_entries
+      IMPORTING iv_arr      TYPE string
+      RETURNING VALUE(rt_)  TYPE string_table.
+
     CLASS-METHODS extract_balanced
       IMPORTING iv_json     TYPE string
                 iv_key      TYPE string
@@ -169,6 +174,46 @@ CLASS zcl_pia_00_json_util IMPLEMENTATION.
         rv_ = rv_ && iv_+lv_i(1).
         lv_i = lv_i + 1.
       ENDIF.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD split_entries.
+    " top-level {...} entries of a JSON array string; defensive: braces inside
+    " string values may be unbalanced, so every access is clamped
+    DATA lv_len_arr TYPE i.
+    lv_len_arr = strlen( iv_arr ).
+    DATA lv_pos TYPE i VALUE 0.
+    WHILE lv_pos < lv_len_arr.
+      FIND FIRST OCCURRENCE OF '{' IN iv_arr+lv_pos MATCH OFFSET DATA(lv_off).
+      IF sy-subrc <> 0. EXIT. ENDIF.
+      DATA lv_start TYPE i.
+      lv_start = lv_pos + lv_off.
+      IF lv_start >= lv_len_arr. EXIT. ENDIF.
+      DATA lv_depth TYPE i.
+      lv_depth = 1.
+      DATA lv_end TYPE i.
+      lv_end = lv_start.
+      WHILE lv_end < lv_len_arr - 1 AND lv_depth > 0.
+        lv_end = lv_end + 1.
+        IF iv_arr+lv_end(1) = '{'.
+          lv_depth = lv_depth + 1.
+        ELSEIF iv_arr+lv_end(1) = '}'.
+          lv_depth = lv_depth - 1.
+        ENDIF.
+      ENDWHILE.
+      IF lv_depth > 0.
+        lv_end = lv_len_arr - 1.
+      ENDIF.
+      DATA lv_len TYPE i.
+      lv_len = lv_end - lv_start + 1.
+      IF lv_len <= 0. EXIT. ENDIF.
+      IF lv_start + lv_len > lv_len_arr.
+        lv_len = lv_len_arr - lv_start.
+      ENDIF.
+      IF lv_len > 0.
+        APPEND iv_arr+lv_start(lv_len) TO rt_.
+      ENDIF.
+      lv_pos = lv_end + 1.
     ENDWHILE.
   ENDMETHOD.
 
