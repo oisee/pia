@@ -31,7 +31,7 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'term.writeln("Connecting...");' TO lv.
     APPEND 'ws=new WebSocket(url);' TO lv.
     APPEND 'ws.onopen=()=>{term.writeln("Connected\\r\\n")};' TO lv.
-    APPEND 'ws.onmessage=(e)=>term.write(e.data.replace(/\\n/g,"\\r\\n"));' TO lv.
+    APPEND 'ws.onmessage=(e)=>term.write(e.data);' TO lv.
     APPEND 'ws.onclose=()=>{term.writeln("\\r\\nDisconnected");ws=null;setTimeout(connect,3000)};' TO lv.
     APPEND '}' TO lv.
     APPEND 'connect();' TO lv.
