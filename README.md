@@ -48,9 +48,9 @@ break `add` → tests red → fix → tests green, five turns per language, 15/1
 
 ## Install on SAP (7.58, tested on the ABAP Platform Trial A4H)
 
-1. **Import the package.** Download `pia-v0.1.3-abapgit.zip` from the release and import it with abapGit
+1. **Import the package.** Download `pia-v0.1.4-abapgit.zip` from the release and import it with abapGit
    (offline repository) into a new local package `$ZPIA`. With vsp:
-   `vsp git import-zip pia-v0.1.3-abapgit.zip --package '$ZPIA'`.
+   `vsp git import-zip pia-v0.1.4-abapgit.zip --package '$ZPIA'`.
 2. **Trust z.ai.** In STRUST add *USERTrust RSA Certification Authority* and *Sectigo Public Server
    Authentication Root R46* to *SSL client Anonymous* and *SSL client Standard*.
 3. **Give PIA a key.** Put a file `pia.env` into the instance's `DIR_HOME` (A4H: `/usr/sap/A4H/D00/work`),
