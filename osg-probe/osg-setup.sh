@@ -9,7 +9,8 @@ set -euo pipefail
 DIR=${1:-$HOME/dev/osg-pia}
 RANGE=${2:-20-29}
 PIA=$(cd "$(dirname "$0")/.." && pwd)
-export PATH=${NODE_BIN:-$HOME/.nvm/versions/node/v22.23.3/bin}:$PATH
+[ -n "${NODE_BIN:-}" ] && export PATH=$NODE_BIN:$PATH   # NODE_BIN: a node 22 bin directory, if the default node is older
+[ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 22 ] || { echo "node 22 or later needed (set NODE_BIN)"; exit 1; }
 mkdir -p "$HOME/.config/pia"
 [ -f "$HOME/.config/pia/pia.env" ] || echo "note: $HOME/.config/pia/pia.env is missing (ZAI_API_KEY=... or PIA_LLM=replay:...)"
 if [ ! -d "$DIR/.git" ]; then git clone https://github.com/oisee/open-steamgate.git "$DIR"; fi

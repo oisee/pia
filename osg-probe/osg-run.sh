@@ -6,7 +6,8 @@
 set -euo pipefail
 TREE=${1:-$HOME/dev/osg-pia}; LOG=${2:-$TREE/.local/osg-pia.log}
 DB=${PIA_DB:-.local/db/pia-jobs.sqlite}
-export PATH=${NODE_BIN:-$HOME/.nvm/versions/node/v22.23.3/bin}:$PATH
+[ -n "${NODE_BIN:-}" ] && export PATH=$NODE_BIN:$PATH   # NODE_BIN: a node 22 bin directory, if the default node is older
+[ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 22 ] || { echo "node 22 or later needed (set NODE_BIN)"; exit 1; }
 cd "$TREE"
 for p in $(ps -eo pid,args | grep "[ ]$TREE/tools/osd-heavy.sh" | awk '{print $1}'); do kill -TERM -"$p" 2>/dev/null || true; done
 for p in $(pgrep -f "[o]sd-batch-runs.mjs worker" || true); do [ "$(readlink /proc/$p/cwd)" = "$TREE" ] && kill "$p" || true; done
