@@ -1,0 +1,46 @@
+[runtime] cross-reference: CROSS 375, WBCROSSGT 6037, WBCROSSGTX 11, D010INC 135 (6636 ms)
+[runtime] boot: seeding the cross-reference 6636 ms
+[runtime] boot: registering services and search helps 2 ms
+[runtime] demo data: taxi: nothing generated at start; a year of rows is made on request (1 ms)
+[runtime] boot: demo data 2 ms
+[runtime] ADT rehydrate: 0 sessions, 0 handles, 0 skipped, 0.01 ms
+[runtime] boot: restoring ADT state and rebuilding locks 44 ms
+warm: a cold build: local/tmp/zcl_pia_00_llm_http.clas.testclasses.abap is new
+build failed: check_syntax, Method name "responses_two_calls_brace_in_string" is too long, maximum length is 30 characters, zcl_pia_00_llm_http.clas.testclasses.abap:10
+osd-tran-registry: ZGUI_L3_FLEET3_CONF (CLASS) -> runs ZCL_OSD_GUITX_L3_FLEET3_CONF - Converted executable report
+osd-tran-registry: ZGUI_OSD_JOB_DOCTOR (CLASS) -> runs ZCL_OSD_GUITX_OSD_JOB_DOCTOR - Converted executable report
+osd-tran-registry: ZGUI_OSD_JOB_DUMP (CLASS) -> runs ZCL_OSD_GUITX_OSD_JOB_DUMP - Converted executable report
+osd-tran-registry: ZGUI_OSD_JOB_E2E (CLASS) -> runs ZCL_OSD_GUITX_OSD_JOB_E2E - Converted executable report
+osd-tran-registry: ZGUI_OSD_JOB_TICK (CLASS) -> runs ZCL_OSD_GUITX_OSD_JOB_TICK - Converted executable report
+osd-tran-registry: ZGUI_OSD_READY (CLASS) -> runs ZCL_OSD_GUITX_OSD_READY - Converted executable report
+osd-tran-registry: ZGUI_OSD_SUB_CTX (CLASS) -> runs ZCL_OSD_GUITX_OSD_SUB_CTX - Converted executable report
+osd-tran-registry: ZGUI_OSD_SUB_RANGE (CLASS) -> runs ZCL_OSD_GUITX_OSD_SUB_RANGE - Converted executable report
+osd-tran-registry: ZGUI_OSD_SUB_SEM (CLASS) -> runs ZCL_OSD_GUITX_OSD_SUB_SEM - Converted executable report
+osd-tran-registry: ZGUI_OSD_VOYAGE (CLASS) -> runs ZCL_OSD_GUITX_OSD_VOYAGE - Converted executable report
+osd-tran-registry: ZGUI_PIA_TURN (CLASS) -> runs ZCL_OSD_GUITX_PIA_TURN - Converted executable report
+osd-tran-registry: ZOSD_NOTE (CLASS) -> runs ZCL_OSD_NOTE - Session notepad
+osd-tran-registry: ZOSD_TEST_DEMO (REPORT) -> refused: report ZOSD_TEST_DEMO_PROG: SUBMIT is not implemented by the transpiler - ZOSD_TEST: run the demo report
+1957 files added from source, 815 skipped
+lib from locked folder: /.local/lars/open-abap-core
+	647 files added from lib
+lib from locked folder: /.local/lars/express-icf-shim
+	6 files added from lib
+lib from locked folder: /.local/lars/open-abap-apc
+	46 files added from lib
+lib from locked folder: /.local/lars/abapgit
+	97 files added from lib
+lib from locked folder: /.local/lars/open-abap-gui
+	358 files added from lib
+lib from locked folder: /.local/lars/open-abap-odata
+	114 files added from lib
+lib from locked folder: /.local/lars/ajson
+	16 files added from lib
+
+warm: builds stay cold: the tree is not the live generation (56e4474fb8bb275e on disk, dd7eebed6a18805d live, e3c5b91d9f933c6f with the saves since put back); a cold build comes first
+[runtime] boot: loading the generation 0 ms
+[runtime] boot: waiting for ADT state 1 ms
+[runtime] boot: importing the generation 1294 ms
+[runtime] boot: opening the database: DDL and seed rows (test/setup.mjs) 190 ms
+[runtime] boot: applying the ICF registry 22 ms
+[runtime] cross-reference: CROSS 375, WBCROSSGT 6039, WBCROSSGTX 11, D010INC 136 (6131 ms)
+[runtime] boot: seeding the cross-reference 6131 ms

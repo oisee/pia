@@ -71,7 +71,10 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'const url=(location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+APC+"?sid="+sid;' TO lv.
     APPEND 'term.writeln("Connecting...");' TO lv.
     APPEND 'ws=new WebSocket(url);' TO lv.
-    APPEND 'ws.onopen=()=>{term.write("\x1b[32mConnected\x1b[0m\r\n\r\n");drawFooter()};' TO lv.
+    APPEND 'ws.onopen=()=>{term.write("\x1b[32mConnected\x1b[0m\r\n\r\n");drawFooter();' TO lv.
+    " a dropped connection ends the turn without DONE: /auto goes on after the reconnect (after the replayed history)
+    APPEND 'if(auto)setTimeout(()=>{if(!auto||st)return;if(auto.left<=0){above("\x1b[2mauto: stopped after "+AUTO_MAX+" turns\x1b[0m");auto=null;return}' TO lv.
+    APPEND 'above("\x1b[2mauto: reconnected, continuing\x1b[0m");auto.left--;auto.txt="";sendNow(AUTO_NEXT)},1500)};' TO lv.
     APPEND 'ws.onmessage=(e)=>{let d=e.data;const fin=d.includes(DONE);d=d.split(DONE).join("");' TO lv.
     APPEND 'if(st){st.n++;st.b+=d.length}if(auto)auto.txt+=d;if(d)above(d);if(fin)done()};' TO lv.
     APPEND 'ws.onclose=()=>{clearFooter();if(st){clearInterval(st.h);st=null}' TO lv.
