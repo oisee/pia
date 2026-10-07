@@ -129,14 +129,32 @@ CLASS zcl_pia_20_b_adt IMPLEMENTATION.
           IMPORTING ev_status = lv_status ev_body = lv_body ).
   ENDMETHOD.
 
+  METHOD zif_pia_20_dev_backend~get_methods.
+    DATA lv_status TYPE i.
+    DATA lv_body TYPE string.
+    CLEAR: et_methods, ev_error.
+    call( EXPORTING iv_method = `GET`
+                    iv_path   = class_url( iv_name ) && `/objectstructure?version=inactive&withShortDescriptions=false`
+                    iv_accept = `application/vnd.sap.adt.objectstructure.v2+xml`
+          IMPORTING ev_status = lv_status ev_body = lv_body ).
+    IF lv_status <> 200.
+      ev_error = |objectstructure of { iv_name }: HTTP { lv_status }|.
+      RETURN.
+    ENDIF.
+    et_methods = zcl_pia_20_adt_structure=>parse( lv_body ).
+  ENDMETHOD.
+
   METHOD zif_pia_20_dev_backend~read_object.
     DATA lv_status TYPE i.
-    call( EXPORTING iv_method = `GET` iv_path = class_url( iv_name ) && `/source/main`
+    DATA(lv_include) = COND string( WHEN iv_include IS INITIAL OR to_lower( iv_include ) = `main` THEN `main` ELSE to_lower( iv_include ) ).
+    call( EXPORTING iv_method = `GET`
+                    iv_path = COND #( WHEN lv_include = `main` THEN class_url( iv_name ) && `/source/main`
+                                      ELSE class_url( iv_name ) && `/includes/` && lv_include )
                     iv_accept = `text/plain`
           IMPORTING ev_status = lv_status ev_body = rs_-source ).
     rs_-ok = xsdbool( lv_status = 200 ).
     IF rs_-ok = abap_true.
-      rs_-message = |read { iv_name } ({ strlen( rs_-source ) } chars)|.
+      rs_-message = |read { iv_name } { lv_include } ({ strlen( rs_-source ) } chars)|.
     ELSE.
       rs_-message = |read { iv_name } failed: HTTP { lv_status }|.
       CLEAR rs_-source.

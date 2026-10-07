@@ -20,11 +20,12 @@ CLASS zcl_pia_10_t_read_object IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_params.
-    rt_ = VALUE #( ( name = 'name' type = 'string' desc = 'Class name, e.g. ZCL_PIA_DEMO' required = abap_true ) ).
+    rt_ = VALUE #( ( name = 'name' type = 'string' desc = 'Class name, e.g. ZCL_PIA_DEMO' required = abap_true )
+                   ( name = 'include' type = 'string' desc = 'main (default) or testclasses (local ABAP Unit test classes)' required = abap_false ) ).
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~get_description.
-    rv_ = 'Read the ABAP source of a class (main include, definition+implementation).'.
+    rv_ = 'Read the full ABAP source of a class include: main (default, definition+implementation) or testclasses. For one method use outline and read_method.'.
   ENDMETHOD.
 
   METHOD zif_pia_00_tool~invoke.
@@ -33,7 +34,11 @@ CLASS zcl_pia_10_t_read_object IMPLEMENTATION.
       rs_ = fail( 'name is required' ).
       RETURN.
     ENDIF.
-    DATA(ls) = mo_backend->read_object( lv_name ).
+    DATA(lv_include) = get_arg( iv_name = 'include' iv_arguments = iv_arguments ).
+    IF lv_include = 'main'.
+      CLEAR lv_include.
+    ENDIF.
+    DATA(ls) = mo_backend->read_object( iv_name = lv_name iv_include = lv_include ).
     IF ls-ok = abap_false.
       rs_ = fail( ls-message ).
       RETURN.

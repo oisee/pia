@@ -56,16 +56,31 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
     rv_ = 'OSG-STORE'.
   ENDMETHOD.
 
+  METHOD zif_pia_20_dev_backend~get_methods.
+    CLEAR: et_methods, ev_error.
+    TRY.
+        DATA(ls) = host( iv_command = 'PARSE'
+                         iv_json    = |\{"kind":"OUTLINE","type":"CLAS","name":"{ to_upper( iv_name ) }"\}| ).
+        IF ls-json NS '"found":true'.
+          ev_error = |{ iv_name } not found|.
+          RETURN.
+        ENDIF.
+        et_methods = zcl_pia_20_adt_structure=>parse_outline_json( ls-json ).
+      CATCH cx_root INTO DATA(lx).
+        ev_error = lx->get_text( ).
+    ENDTRY.
+  ENDMETHOD.
+
   METHOD zif_pia_20_dev_backend~read_object.
     TRY.
         DATA(ls) = host(
           iv_command = 'READ'
           iv_type    = 'CLAS'
           iv_name    = to_upper( iv_name )
-          iv_include = 'main' ).
+          iv_include = COND string( WHEN iv_include IS INITIAL THEN `main` ELSE to_lower( iv_include ) ) ).
         rs_-ok = abap_true.
         rs_-source = ls-source.
-        rs_-message = |read { iv_name } ({ strlen( ls-source ) } chars)|.
+        rs_-message = |read { iv_name } { iv_include } ({ strlen( ls-source ) } chars)|.
       CATCH cx_root INTO DATA(lx).
         rs_-ok = abap_false.
         rs_-message = lx->get_text( ).

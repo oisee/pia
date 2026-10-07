@@ -20,6 +20,16 @@ CLASS zcl_pia_15_toolset IMPLEMENTATION.
     DATA(lo_act) = NEW zcl_pia_15_t_activate( ).
     lo_act->set_backend( io_backend ).
     io_registry->register( lo_act ).
+    " method level: the system's own method ranges (ADT objectstructure / STORE PARSE OUTLINE)
+    DATA(lo_outline) = NEW zcl_pia_15_t_outline( ).
+    lo_outline->set_backend( io_backend ).
+    io_registry->register( lo_outline ).
+    DATA(lo_rmeth) = NEW zcl_pia_15_t_read_method( ).
+    lo_rmeth->set_backend( io_backend ).
+    io_registry->register( lo_rmeth ).
+    DATA(lo_wmeth) = NEW zcl_pia_15_t_write_method( ).
+    lo_wmeth->set_backend( io_backend ).
+    io_registry->register( lo_wmeth ).
     DATA(lo_test) = NEW zcl_pia_15_t_run_tests( ).
     lo_test->set_backend( io_backend ).
     io_registry->register( lo_test ).
