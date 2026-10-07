@@ -1,0 +1,82 @@
+CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    " NAME=value lines; never committed. OSG: dir in OSD_DATASET_READ / OSD_DATASET_HOME.
+    " SAP: application server file (DIR_HOME or full path).
+    CONSTANTS c_file TYPE string VALUE `pia.env`.
+    " settings without secrets (PIA_LLM, PIA_MODEL, PIA_TURN_MODE); read when pia.env has no value
+    CONSTANTS c_settings TYPE string VALUE `pia-settings.env`.
+
+    CLASS-METHODS get
+      IMPORTING iv_name    TYPE string
+      RETURNING VALUE(rv_) TYPE string.
+
+    " PIA_MODEL from pia.env, default glm-5.3 (glm-5.3-flash wrote invalid ABAP and empty tool args)
+    CLASS-METHODS model
+      RETURNING VALUE(rv_) TYPE string.
+
+    " public only so the local ABAP Unit tests can inject their own file
+    CLASS-METHODS get_from
+      IMPORTING iv_file    TYPE string
+                iv_name    TYPE string
+      RETURNING VALUE(rv_) TYPE string.
+
+ENDCLASS.
+
+CLASS zcl_pia_00_config IMPLEMENTATION.
+
+  METHOD model.
+    rv_ = get( `PIA_MODEL` ).
+    IF rv_ IS INITIAL.
+      rv_ = `glm-5.3`.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get.
+    rv_ = get_from( iv_file = c_file iv_name = iv_name ).
+    IF rv_ IS INITIAL.
+      rv_ = get_from( iv_file = c_settings iv_name = iv_name ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_from.
+    " README-style lines are NAME=value # comment; comment, blanks around key/value
+    " and line ends must never reach the caller (they once did: model "glm-5.3 # optional")
+    DATA lv_line  TYPE string.
+    DATA lv_key   TYPE string.
+    DATA lv_value TYPE string.
+    DATA lv_off   TYPE i.
+
+    TRY.
+        OPEN DATASET iv_file FOR INPUT IN TEXT MODE ENCODING UTF-8.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        DO.
+          READ DATASET iv_file INTO lv_line.
+          IF sy-subrc <> 0.
+            EXIT.
+          ENDIF.
+          lv_line = condense( lv_line ).             " line ends and stray blanks
+          IF lv_line IS INITIAL OR lv_line(1) = `#`.
+            CONTINUE.                                " blank line or full-line comment
+          ENDIF.
+          CLEAR lv_off.
+          FIND FIRST OCCURRENCE OF `=` IN lv_line MATCH OFFSET lv_off.
+          IF sy-subrc <> 0.
+            CONTINUE.
+          ENDIF.
+          lv_key = to_upper( condense( substring( val = lv_line len = lv_off ) ) ).
+          IF lv_key = to_upper( iv_name ).
+            lv_value = substring( val = lv_line off = lv_off + 1 ).
+            rv_ = condense( substring_before( val = lv_value sub = ` #` ) ).
+            EXIT.
+          ENDIF.
+        ENDDO.
+        CLOSE DATASET iv_file.
+      CATCH cx_root.
+        CLEAR rv_.
+    ENDTRY.
+  ENDMETHOD.
+
+ENDCLASS.

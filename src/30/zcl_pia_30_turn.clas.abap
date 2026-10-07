@@ -85,10 +85,17 @@ CLASS zcl_pia_30_turn IMPLEMENTATION.
           iv_max_iterations = 8
           iv_continue       = xsdbool( lines( lo_session->get_messages( ) ) > 0 ) ).
         zcl_pia_00_session_store=>save( iv_sid = iv_sid io_session = lo_session ).
-        " the LLM refused the request (4xx, not a rate limit) while PIA's own code was changed: roll it back too
-        IF ls_result-error CP 'HTTP 4*' AND ls_result-error NP 'HTTP 429*'.
-          DATA(lv_back) = zcl_pia_15_self_guard=>check_and_restore(
-            io_backend = lo_backend iv_failure = |the LLM refused the request ({ substring( val = ls_result-error len = nmin( val1 = 200 val2 = strlen( ls_result-error ) ) ) })| ).
+        " after PIA changed its own code: a turn that could not talk to the LLM (a refused request, or an empty
+        " answer without tool calls) rolls the change back; a normal turn confirms it
+        DATA(lv_failure) = COND string(
+          WHEN ls_result-error CP 'HTTP 4*' AND ls_result-error NP 'HTTP 429*'
+            THEN |the LLM refused the request ({ substring( val = ls_result-error len = nmin( val1 = 200 val2 = strlen( ls_result-error ) ) ) })|
+          WHEN ls_result-error IS INITIAL AND ls_result-answer IS INITIAL AND ls_result-tool_calls = 0
+            THEN `the LLM call came back empty (no answer, no tool calls)` ).
+        IF lv_failure IS INITIAL AND ls_result-error IS INITIAL.
+          zcl_pia_15_self_guard=>confirm( ).
+        ELSEIF lv_failure IS NOT INITIAL.
+          DATA(lv_back) = zcl_pia_15_self_guard=>check_and_restore( io_backend = lo_backend iv_failure = lv_failure ).
           IF lv_back IS NOT INITIAL.
             lo_session->push_message( iv_role = 'assistant' iv_content = |[PIA runtime] { lv_back }| ).
             zcl_pia_00_session_store=>save( iv_sid = iv_sid io_session = lo_session ).

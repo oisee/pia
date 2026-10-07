@@ -18,6 +18,9 @@ CLASS zcl_pia_15_self_guard DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_failure TYPE string OPTIONAL
       RETURNING VALUE(rv_) TYPE string.
 
+    " a turn talked to the LLM normally: PIA's own changes are confirmed, the backups dropped
+    CLASS-METHODS confirm.
+
     " the self-check alone: '' when tool calls still parse
     CLASS-METHODS self_check RETURNING VALUE(rv_) TYPE string.
 
@@ -58,6 +61,10 @@ CLASS zcl_pia_15_self_guard IMPLEMENTATION.
     zcl_pia_00_session_store=>append_line( iv_file = c_index iv_line = lv_entry ).
   ENDMETHOD.
 
+  METHOD confirm.
+    zcl_pia_00_session_store=>write_lines( iv_file = c_index it_ = VALUE #( ) ).
+  ENDMETHOD.
+
   METHOD self_check.
     " two calls as the LLM sends them (Responses and Chat); the arguments must come back exactly
     DATA(lv_a1) = `{"name":"ZCL_PIA_DEMO"}`.
@@ -96,9 +103,7 @@ CLASS zcl_pia_15_self_guard IMPLEMENTATION.
     ENDIF.
     DATA(lv_fail) = COND string( WHEN iv_failure IS NOT INITIAL THEN iv_failure ELSE self_check( ) ).
     IF lv_fail IS INITIAL.
-      " the live code still works: the backups are not needed any more
-      zcl_pia_00_session_store=>write_lines( iv_file = c_index it_ = VALUE #( ) ).
-      RETURN.
+      RETURN.   " parsing works; the backups stay until a turn has talked to the LLM (confirm)
     ENDIF.
     DATA lt_done TYPE string_table.
     LOOP AT lt_index INTO DATA(lv_entry).
@@ -118,7 +123,7 @@ CLASS zcl_pia_15_self_guard IMPLEMENTATION.
     zcl_pia_00_session_store=>write_lines( iv_file = c_index it_ = VALUE #( ) ).
     rv_ = |after your change to your own code: { lv_fail }. |
        && |So that you can work again, the previous versions were written back and activated: { concat_lines_of( table = lt_done sep = `, ` ) }. |
-       && `They go live when this turn ends. Make the change again so that tool calls still parse at every step.`.
+       && `They go live when this turn ends. Make the change again so that PIA keeps working at every step (read its settings, call the LLM, parse tool calls).`.
   ENDMETHOD.
 
 ENDCLASS.
