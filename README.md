@@ -65,8 +65,30 @@ PIA keeps its conversations as `pia-session-<id>.txt` next to `pia.env`. Setting
 
 `PIA_LLM=record:<file>` in `pia-settings.env` appends every LLM response to `<file>`; `PIA_LLM=replay:<file>`
 answers from it instead of calling the LLM, in the same order (the position is kept in `<file>.pos`; delete it
-to start over). A replayed run needs no key and no network. The release carries `pia-chapter.rec`, the
-three-language scenario of the e2e test recorded on open-steamgate.
+to start over). Replay does not look at the task: the n-th call gets the n-th recorded answer. A replayed run
+needs no key and no network.
+
+`replay/` holds the e2e scenario recorded on open-steamgate, one file per language
+(`pia-chapter.en.rec`, `.da.rec`, `.ru.rec`, 13 answers each; `pia-chapter.rec` is all three in the order
+en, da, ru). To replay English:
+
+```
+cp replay/pia-chapter.en.rec ~/.config/pia/
+echo "PIA_LLM=replay:pia-chapter.en.rec" > ~/.config/pia/pia-settings.env
+rm -f ~/.config/pia/pia-chapter.en.rec.pos
+```
+
+then type the five tasks of the scenario into the terminal, or run the test for that one language:
+
+```
+cd <open-steamgate tree> && npx playwright install chromium     # once
+PIA_E2E_USER=alice PIA_E2E_PASS=alice OSG=<open-steamgate tree> \
+  node osg-probe/ui/tui-e2e.mjs http://127.0.0.1:<port>/sap/bc/zpia_tui/ en
+```
+
+The tasks (en): *Run the tests of ZCL_PIA_DEMO.* · *In ZCL_PIA_DEMO, change add to a - b and activate it.* ·
+*Run the tests of ZCL_PIA_DEMO again.* · *Change add back to a + b and activate it.* · *Run the tests of
+ZCL_PIA_DEMO once more.* (the Danish and Russian ones are in `tui-e2e.mjs`).
 
 ## On open-steamgate (preview)
 
@@ -80,9 +102,11 @@ All of it is in open-steamgate `292a4c60` (stable tag `vscode-stable-v0.7.1696`)
 there, live and replayed, with no workarounds. `osg-setup.sh` checks out that tag (`OSG_REF=main` for the latest).
 
 `osg-probe/osg-setup.sh` clones open-steamgate, pins the transpiler, deploys PIA and starts it; `osg-run.sh`
-restarts it with background jobs. On open-steamgate a turn runs inline, and an activation goes live when the
-turn ends, so run the tests in the next turn. On a fresh database activate `ZCL_PIA_DEMO` once (or let PIA do
-it) before the first test run.
+restarts it with background jobs. `osg-setup.sh` waits until the server is up, activates `ZCL_PIA_DEMO` once
+(on a fresh database `RUN_TESTS` needs an activated version; by hand:
+`PORT=<port> osg-probe/activate.sh CLAS:zcl_pia_demo`) and prints the terminal's URL; the port is also the
+`STG_PORT=` of the log's heavy-wrapper line. On open-steamgate a turn runs inline, and an activation goes live
+when the turn ends, so run the tests in the next turn.
 
 ## How it is built
 

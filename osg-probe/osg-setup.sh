@@ -29,4 +29,11 @@ LOG=${LOG:-$DIR/.local/osg-pia.log}
 setsid nohup env OSD_HEAVY_RANGE="$RANGE" OSD_HEAVY_SLOTS=3 OSD_ADT_ONE_RUNTIME=1 OSD_WARM=1 \
   OSD_DATASET_READ="$HOME/.config/pia" OSD_DATASET_WRITE="$HOME/.config/pia" OSD_DATASET_HOME="$HOME/.config/pia" \
   bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-127.0.0.1} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
-echo "starting; log: $LOG (the port is in its first line, e.g. STG_PORT=8021); first build takes a few minutes"
+echo "starting; log: $LOG; the first build takes a few minutes"
+# wait until the generation is served, then take the port from the heavy wrapper's line (STG_PORT=...)
+for i in $(seq 1 300); do grep -q "serving generation" "$LOG" 2>/dev/null && break; sleep 2; done
+grep -q "serving generation" "$LOG" || { echo "not up after 10 minutes, see $LOG"; exit 1; }
+PORT=$(grep -o 'STG_PORT=[0-9]*' "$LOG" | head -1 | cut -d= -f2)
+# activate the demo class once: RUN_TESTS needs an activated version on a fresh database
+PORT=$PORT "$PIA/osg-probe/activate.sh" CLAS:zcl_pia_demo
+echo "PIA terminal: http://127.0.0.1:$PORT/sap/bc/zpia_tui/ (user alice, password alice)"

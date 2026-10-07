@@ -1,21 +1,31 @@
 // End-to-end UI test of the PIA terminal: green -> break -> red -> fix -> green, in English, Danish and Russian.
 // Five turns, because on open-steamgate an activation publishes at the end of the turn (tests run in the next one).
-// usage: node tui-e2e.mjs [base-url] [lang,...]   default: A4H, en,da,ru
-// Credentials: the a4h-vsp entry of ~/dev/pia/.mcp.json (never printed). Screenshots: ./shots/<lang>-<n>-<step>.png
-import {readFileSync, mkdirSync} from "node:fs";
+// usage: node tui-e2e.mjs <terminal-url> [lang,...]   e.g. http://127.0.0.1:8020/sap/bc/zpia_tui/ en,da,ru
+// Credentials: PIA_E2E_USER / PIA_E2E_PASS (else the a4h-vsp entry of this repository's .mcp.json; never printed).
+// Playwright comes from the open-steamgate tree (OSG=..., default ~/dev/osg-pia; `npx playwright install chromium`
+// there once); PIA_E2E_CHROME=<path> picks another Chromium. Screenshots: ./shots/<lang>-<n>-<step>.png
+// Replay: each language has its own transcript (replay/pia-chapter.<lang>.rec), so run one language per replay.
+import {readFileSync, mkdirSync, existsSync} from "node:fs";
+import {homedir} from "node:os";
 import {createRequire} from "node:module";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
-const {chromium} = createRequire("/home/alice/dev/osg-pia/package.json")("playwright");
+const osg = process.env.OSG || join(homedir(), "dev", "osg-pia");
+let chromium;
+try { ({chromium} = createRequire(join(osg, "package.json"))("playwright")); }
+catch (e) { console.log(`playwright not found in ${osg} (set OSG=<open-steamgate tree>, run npm ci there)`); process.exit(2); }
 const here = dirname(fileURLToPath(import.meta.url));
-const base = process.argv[2] || "http://192.168.8.105:50000/sap/bc/zpia_tui/?sap-client=001";
+const base = process.argv[2];
+if (!base) { console.log("usage: node tui-e2e.mjs <terminal-url> [lang,...]"); process.exit(2); }
 const langs = (process.argv[3] || "en,da,ru").split(",");
 // credentials: PIA_E2E_USER/PIA_E2E_PASS, else the a4h-vsp entry of .mcp.json; class: PIA_E2E_CLASS
 let creds;
 if (process.env.PIA_E2E_USER) creds = {username: process.env.PIA_E2E_USER, password: process.env.PIA_E2E_PASS ?? ""};
-else { const cfg = JSON.parse(readFileSync("/home/alice/dev/pia/.mcp.json", "utf8")).mcpServers["a4h-vsp"];
+else if (existsSync(join(here, "..", "..", ".mcp.json"))) {
+  const cfg = JSON.parse(readFileSync(join(here, "..", "..", ".mcp.json"), "utf8")).mcpServers["a4h-vsp"];
   creds = {username: cfg.args[cfg.args.indexOf("--user") + 1], password: cfg.env.SAP_PASSWORD}; }
-const CLS = process.env.PIA_E2E_CLASS || "ZCL_PIA_DEMO4";
+else { console.log("set PIA_E2E_USER and PIA_E2E_PASS"); process.exit(2); }
+const CLS = process.env.PIA_E2E_CLASS || "ZCL_PIA_DEMO";
 const SHOTS = process.env.PIA_E2E_SHOTS || "shots";
 const SETTLE = Number(process.env.PIA_E2E_SETTLE || 0);
 const STEPS = {
@@ -36,7 +46,9 @@ const STEPS = {
        ["green2", `Запусти тесты ${CLS} ещё раз.`, /pass|green|зелён|прош|пройден|успешн/i]],
 };
 mkdirSync(join(here, SHOTS), {recursive: true});
-const b = await chromium.launch({executablePath: "/home/alice/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"});
+let b;
+try { b = await chromium.launch(process.env.PIA_E2E_CHROME ? {executablePath: process.env.PIA_E2E_CHROME} : {}); }
+catch (e) { console.log(`no browser: ${e.message.split("\n")[0]}\nrun \`npx playwright install chromium\` in ${osg}, or set PIA_E2E_CHROME`); process.exit(2); }
 let failed = 0;
 for (const lang of langs) {
   const ctx = await b.newContext({viewport: {width: 1100, height: 760}, httpCredentials: creds});  // fresh session id per language
