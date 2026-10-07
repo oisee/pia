@@ -55,6 +55,17 @@ CLASS zcl_pia_30_turn IMPLEMENTATION.
         ENDIF.
         DATA(lo_session) = zcl_pia_00_session_store=>load( iv_sid ).
         DATA(lo_backend) = zcl_pia_20_backend=>default( ).
+        " self-hosting insurance: if PIA's last change to its own code broke reading tool calls, roll it back
+        " before asking the LLM (that code could not parse the answer) and end the turn
+        DATA(lv_guard) = zcl_pia_15_self_guard=>check_and_restore( lo_backend ).
+        IF lv_guard IS NOT INITIAL.
+          lo_session->push_message( iv_role = 'user' iv_content = lv_task ).
+          lo_session->push_message( iv_role = 'assistant' iv_content = |[PIA runtime] { lv_guard }| ).
+          zcl_pia_00_session_store=>save( iv_sid = iv_sid io_session = lo_session ).
+          lo_amc->publish_answer( |[PIA runtime] { lv_guard }| ).
+          lo_amc->publish_done( ).
+          RETURN.
+        ENDIF.
         DATA(lo_registry) = zcl_pia_00_registry=>new( ).
         zcl_pia_15_toolset=>register_dev_tools( io_registry = lo_registry io_backend = lo_backend ).
         DATA(lo_llm) = zcl_pia_00_llm_http=>new( VALUE #(

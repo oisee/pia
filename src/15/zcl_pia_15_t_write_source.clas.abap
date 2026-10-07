@@ -45,6 +45,7 @@ CLASS zcl_pia_15_t_write_source IMPLEMENTATION.
     IF lv_include = 'main'.
       CLEAR lv_include.
     ENDIF.
+    zcl_pia_15_self_guard=>remember( io_backend = mo_backend iv_name = lv_name iv_include = lv_include ).
     DATA(ls) = mo_backend->write_source( iv_name = lv_name iv_source = lv_source iv_include = lv_include ).
     IF ls-ok = abap_false.
       rs_ = fail( ls-message ).

@@ -103,6 +103,8 @@ CLASS zcl_pia_15_t_write_method IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     lt_lines = lt_out.
+    zcl_pia_15_self_guard=>remember( io_backend = mo_backend iv_name = lv_name
+                                     iv_include = COND #( WHEN ls_span-include = `main` THEN `` ELSE ls_span-include ) ).
     DATA(ls_write) = mo_backend->write_source( iv_name = lv_name iv_include = COND #( WHEN ls_span-include = `main` THEN `` ELSE ls_span-include )
                                                iv_source = concat_lines_of( table = lt_lines sep = cl_abap_char_utilities=>newline )
                                                  && COND string( WHEN substring( val = ls_read-source off = strlen( ls_read-source ) - 1 len = 1 )
