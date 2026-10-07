@@ -5,6 +5,23 @@ CLASS zcl_pia_20_b_osg_store DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
     CLASS-METHODS new RETURNING VALUE(ro_) TYPE REF TO zcl_pia_20_b_osg_store.
 
+  PRIVATE SECTION.
+    " the answer of ZCL_OSD_ADT_HOST=>STORE (same components as its TY_ANSWER)
+    TYPES: BEGIN OF ts_answer,
+             json   TYPE string,
+             source TYPE string,
+           END OF ts_answer.
+    " open-steamgate's host is called dynamically, so the class also compiles on SAP (one zip for both)
+    METHODS host
+      IMPORTING iv_command TYPE string
+                iv_type    TYPE string OPTIONAL
+                iv_name    TYPE string OPTIONAL
+                iv_include TYPE string OPTIONAL
+                iv_json    TYPE string OPTIONAL
+                iv_source  TYPE string OPTIONAL
+      RETURNING VALUE(rs_) TYPE ts_answer
+      RAISING   cx_static_check cx_dynamic_check.
+
 ENDCLASS.
 
 CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
@@ -13,13 +30,35 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
     ro_ = NEW #( ).
   ENDMETHOD.
 
+  METHOD host.
+    DATA lt_par TYPE abap_parmbind_tab.
+    INSERT VALUE #( name = 'IV_COMMAND' kind = cl_abap_objectdescr=>exporting value = REF #( iv_command ) ) INTO TABLE lt_par.
+    IF iv_type IS SUPPLIED.
+      INSERT VALUE #( name = 'IV_TYPE' kind = cl_abap_objectdescr=>exporting value = REF #( iv_type ) ) INTO TABLE lt_par.
+    ENDIF.
+    IF iv_name IS SUPPLIED.
+      INSERT VALUE #( name = 'IV_NAME' kind = cl_abap_objectdescr=>exporting value = REF #( iv_name ) ) INTO TABLE lt_par.
+    ENDIF.
+    IF iv_include IS SUPPLIED.
+      INSERT VALUE #( name = 'IV_INCLUDE' kind = cl_abap_objectdescr=>exporting value = REF #( iv_include ) ) INTO TABLE lt_par.
+    ENDIF.
+    IF iv_json IS SUPPLIED.
+      INSERT VALUE #( name = 'IV_JSON' kind = cl_abap_objectdescr=>exporting value = REF #( iv_json ) ) INTO TABLE lt_par.
+    ENDIF.
+    IF iv_source IS SUPPLIED.
+      INSERT VALUE #( name = 'IV_SOURCE' kind = cl_abap_objectdescr=>exporting value = REF #( iv_source ) ) INTO TABLE lt_par.
+    ENDIF.
+    INSERT VALUE #( name = 'RS_ANSWER' kind = cl_abap_objectdescr=>receiving value = REF #( rs_ ) ) INTO TABLE lt_par.
+    CALL METHOD ('ZCL_OSD_ADT_HOST')=>('STORE') PARAMETER-TABLE lt_par.
+  ENDMETHOD.
+
   METHOD zif_pia_20_dev_backend~get_name.
     rv_ = 'OSG-STORE'.
   ENDMETHOD.
 
   METHOD zif_pia_20_dev_backend~read_object.
     TRY.
-        DATA(ls) = zcl_osd_adt_host=>store(
+        DATA(ls) = host(
           iv_command = 'READ'
           iv_type    = 'CLAS'
           iv_name    = to_upper( iv_name )
@@ -35,7 +74,7 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
 
   METHOD zif_pia_20_dev_backend~write_source.
     TRY.
-        DATA(ls) = zcl_osd_adt_host=>store(
+        DATA(ls) = host(
           iv_command = 'WRITE'
           iv_type    = 'CLAS'
           iv_name    = to_upper( iv_name )
@@ -52,7 +91,7 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
   METHOD zif_pia_20_dev_backend~activate.
     CLEAR rs_.
     TRY.
-        DATA(ls) = zcl_osd_adt_host=>store(
+        DATA(ls) = host(
           iv_command = 'ACTIVATE'
           iv_type    = 'CLAS'
           iv_name    = to_upper( iv_name ) ).
@@ -104,7 +143,7 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
     ENDIF.
     lv_json = lv_json && `}`.
     TRY.
-        rs_-source = zcl_osd_adt_host=>store( iv_command = 'RUN_TESTS' iv_json = lv_json )-json.
+        rs_-source = host( iv_command = 'RUN_TESTS' iv_json = lv_json )-json.
         lv_state = zcl_pia_00_json_util=>extract_str( iv_json = rs_-source iv_name = 'state' ).
         lv_counts = zcl_pia_00_json_util=>extract_balanced(
           iv_json = rs_-source iv_key = 'counts' iv_open = '{' iv_close = '}' ).
@@ -126,7 +165,7 @@ CLASS zcl_pia_20_b_osg_store IMPLEMENTATION.
     CLEAR rs_.
     TRY.
         DATA(lv_json) = '{"op_id":"' && iv_op_id && '"}'.
-        DATA(ls) = zcl_osd_adt_host=>store(
+        DATA(ls) = host(
           iv_command = 'ACTIVATION_STATUS'
           iv_json    = lv_json ).
 

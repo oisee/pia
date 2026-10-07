@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build the abapGit offline zip of PIA for SAP: one local package $ZPIA (folder logic FULL, src/ = $ZPIA).
-Leaves out what only OSG needs (zcl_pia_20_b_osg_store, OSG-style *.sicf.xml) and debug code (mock_run);
-SICF nodes come from osg-probe/a4h/abapgit-front in abapGit's naming."""
+"""Build the abapGit offline zip of PIA: one local package $ZPIA (folder logic FULL, src/ = $ZPIA), the same zip
+for SAP and open-steamgate. Leaves out debug code (mock_run) and the OSG-style *.sicf.xml; SICF nodes come from
+osg-probe/a4h/abapgit-front in abapGit's naming (open-steamgate reads the <URL>, not the file name)."""
 import os, sys, zipfile, glob
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 version = sys.argv[1] if len(sys.argv) > 1 else "dev"
 out = os.path.join(root, "release", f"pia-{version}-abapgit.zip")
-skip = ("zcl_pia_20_b_osg_store.", "zcl_pia_90_mock_run.", "package.devc.xml")
+skip = ("zcl_pia_90_mock_run.", "package.devc.xml")
 files = []
 for f in sorted(glob.glob(os.path.join(root, "src", "**", "*"), recursive=True)):
     b = os.path.basename(f)
