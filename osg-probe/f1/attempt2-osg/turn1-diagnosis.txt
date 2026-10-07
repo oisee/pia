@@ -1,0 +1,255 @@
+Attempt 2, turn 1 (0-457 s): PIA's answer after reading its own classes; no hint beyond the task text.
+
+
+Let me start by investigating the bug. The report says: when the model answers with two tool calls, and the first call's source contains a string literal with a single opening brace like `lv_open = '{'.`, PIA runs only the first call. The arguments arrive with extra text after the JSON (","call_id":"c1","status":"completed"}) and the second call is lost.
+
+This smells like the JSON parser (ZCL_PIA_00_JSON_UTIL or ZCL_PIA_00_LLM_HTTP) doesn't handle string escaping correctly — when scanning the arguments string, it finds the opening brace `{` inside the string literal `'{'` and starts treating things as JSON incorrectly, or it uses naive brace matching / substring extraction that fails when the JSON string contains a brace inside a string value.
+
+Actually the symptom: "arguments arrive with extra text after the JSON (","call_id":"c1","status":"completed"}" — that suggests the parser extracts the value of the "arguments" field but the value scan doesn't stop correctly, swallowing past the closing quote into subsequent JSON text. If the value contains a `{` inside a string literal... Hmm, let me think.
+
+The tool call JSON from the model probably looks like:
+
+```json
+{"name":"write_source","arguments":{"name":"ZCL_X","source":"... lv_open = '{'. ..."}}
+```
+
+or arguments as a string: `"arguments":"{\"name\":..., \"source\":\"... '{' ...\"}"`.
+
+If the parser scans for a closing quote to find the end of a string value, and the string contains escaped quotes `\"`, it should skip them. If the parser instead scans for braces, a `{` inside a string value would break it.
+
+The extra text `","call_id":"c1","status":"completed"}` suggests the value ends at some later point. Let me just read the code.
+
+Plan:
+1. read ZCL_PIA_00_LLM_HTTP and ZCL_PIA_00_JSON_UTIL.
+2. Find the parsing bug.
+3. Write a red unit test in testclasses of the relevant class (probably ZCL_PIA_00_LLM_HTTP or JSON_UTIL).
+4. Fix, activate, run tests.
+5. Ensure ESCAPE_EMOJI_PAIR stays as-is (red).
+
+Let me read the two classes first, in parallel.Now let me identify the bug. The report: model answers with two tool calls; the first call's arguments source contains a string literal with a single opening brace, e.g. `lv_open = '{'.`. In JSON, that brace is escaped inside the arguments string: `"arguments":"{\"name\":\"ZCL_X\",\"source\":\"CLASS ... lv_open = '{'. ...\"}"`. Wait — actually a single `{` inside a JSON string does NOT need escaping. So the arguments value in raw JSON is a string containing `{`.
+
+Now parse_calls_responses / parse_calls_chat do:
+```
+ls-arguments = unescape( extract_balanced( iv_json = lv_e iv_key = 'arguments' iv_open = '{' iv_close = '}' ) ).
+```
+extract_balanced finds `"arguments"` then finds first `{` after it — but the first `{` is INSIDE the string value (the literal `lv_open = '{'.` appears inside the arguments string). Wait, the arguments value is a JSON string, so it starts with `"`. The content `{"name":...` — hmm, in the responses API, `arguments` is a string containing JSON. So the entry looks like:
+
+```
+{"type":"function_call","id":"fc_1","call_id":"c1","name":"write_source","arguments":"{\"name\":\"ZCL_X\",\"source\":\"... lv_open = '{'. ...\"}","status":"completed"}
+```
+
+extract_balanced with key `arguments`, open `{`, close `}`:
+- finds `"arguments"` at offset.
+- lv_rest = from there: `"arguments":"{\"name\":\"ZCL_X\",...`
+- finds first `{` — that's the `{` of `{"name":...` (the escaped one: `\"{`? no wait). The arguments string content is `{\"name\":...}`. The first `{` character in lv_rest is the opening brace of the arguments JSON. Good.
+- Then it counts depth: increments on `{`, decrements on `}`. But the `{` inside the string literal `lv_open = '{'.` is also a `{` → depth becomes 2 when it should not. So the closing `}` of the arguments JSON brings depth to 1, not 0, and the scan continues past the end of the arguments string, consuming `","status":"completed"}` and even the next entry `{"type":"function_call","call_id":"c2",...}` until depth reaches 0 at the `}` of the second entry.
+
+Result: arguments of the first call includes trailing junk `...","status":"completed"},{"type":"function_call",...}` up to balance — matching the reported symptom "arguments arrive with extra text after the JSON (","call_id":"c1","status":"completed"})" — hmm, actually reported extra text is `","call_id":"c1","status":"completed"}`. Hmm wait. Let me reconsider: the reported extra text after the JSON is `","call_id":"c1","status":"completed"}`. So arguments = `{"name":...source with '{'...}` + `","call_id":"c1","status":"completed"}`? That means depth never reached 0 within... hmm, let's trace: if the source has an unmatched `{` (one `{` with no matching `}`), then the arguments JSON `{"name":...,"source":"...'{'..."}` — the scan starts at the outer `{` depth=1. Inside, the `{` from the literal increments depth to 2. The final `}` of arguments decrements to 1. Continue scanning: `","call_id":"c1","status":"completed"}` → that final `}` decrements to 0. So the extracted balanced text = `{arguments...}","call_id":"c1","status":"completed"}` — wait but includes also... the `}` at end. So arguments = `{...}","call_id":"c1","status":"completed"}` — hmm but reported extra text is `","call_id":"c1","status":"completed"}` — yes matches (maybe without trailing `}`, whatever). Then, since the extraction consumed past the first entry's end into... Actually it stops at the `}` closing the first entry (status completed). So lv_pos points at end of first entry. Then split_entries: it splits by brace counting too, with the same flaw! split_entries counts `{`/`}` without regard to strings. The first entry starts at `{`, depth counting: the literal `{` increments depth, so the first entry's closing `}` brings depth to 1, and it continues into the second entry until its closing `}` → depth 0. So the first "entry" swallowed the second entry → second call lost. That's exactly the bug: "PIA runs only the first call... and the second call is lost."
+
+So the root cause: brace counting in `split_entries` and `extract_balanced` ignores braces inside JSON string literals.
+
+Fix: make both methods string-aware — skip characters inside quoted strings (handling `\"` escapes).
+
+For extract_balanced: after finding the key, find the first opening char — careful: the opening `{` could be inside a string too. E.g., arguments is a string whose content starts with `{`. Hmm: `"arguments":"{\"name\"...` — in raw JSON the content braces are not escaped (only quotes are). So the raw text is `"arguments":"{"name":"...`... wait no! In JSON, a string value cannot contain unescaped `"`. So the arguments string content `{"name":...}` contains `"` chars which MUST be escaped as `\"`. So raw: `"arguments":"{\"name\":\"ZCL_X\",\"source\":\"...\"}"`. The `{` and `}` inside need no escaping. So after `"arguments":` we have `"{\"name\"...`. The first `{` found is the content's opening brace — correct. But if the source contains a string literal with `{`, e.g. `lv_open = '{'.`, that's just `{` in the raw JSON at that point. Fine.
+
+But a subtle case: what if arguments value... the scan should start at first `{` after the key — that is the content `{`. Then depth counting must skip braces inside string literals *within the arguments content itself*? The arguments content is JSON: `{"name":"Z","source":"CLASS ... '{' ..."}`. Within this content JSON, the `'{''` is inside the content's string value (source). So when scanning the arguments content as JSON, braces inside the source string must be ignored. So yes, string-aware scanning is needed in extract_balanced too.
+
+So the fix: implement a helper that scans with awareness of double-quoted strings (toggle in_string on unescaped `"`), skipping `\X` escapes inside strings.
+
+Let me write a shared private... but JSON_UTIL is a utility class with all public static methods; I can add a new public method or just fix inline in both methods. I'll add a private static method `scan_balanced` maybe. Actually simpler: modify split_entries and extract_balanced to track in-string state.
+
+Also extract_str uses PCRE `([^"\\]|\\.)*` — that's already string-aware. Good.
+
+Now: write a red test. Tests live in testclasses include of a class. Which class has tests for parse_calls? Let me check the testclasses of ZCL_PIA_00_LLM_HTTP. read_object returns "main include, definition+implementation" — maybe testclasses are separate; I can only read main via read_object. Hmm, "Read the ABAP source of a class (main include, definition+implementation)". The testclasses include is written via write_source with include='testclasses'. To see existing tests I can't read them... risky: writing testclasses would overwrite existing tests (like ESCAPE_EMOJI_PAIR mentioned — it's in some testclasses). ESCAPE_EMOJI_PAIR is presumably in ZCL_PIA_00_JSON_UTIL's testclasses. The user says it's already red and to leave it.
+
+I need to add a test reproducing the bug. Where? Best place: testclasses of ZCL_PIA_00_LLM_HTTP (parse_calls_responses/parse_calls_chat) or ZCL_PIA_00_JSON_UTIL (split_entries/extract_balanced). But I can't read existing testclasses to preserve them... Let me try read_object on the class — maybe it returns both includes? It says main include. Hmm. Maybe I can guess. Risky to overwrite.
+
+Maybe there's a dedicated test class like ZCL_PIA_00_JSON_UTIL has local test classes ltcl_json_util with methods like ESCAPE_EMOJI_PAIR. If I overwrite testclasses of JSON_UTIL I'd destroy ESCAPE_EMOJI_PAIR. The user said "One existing test, ESCAPE_EMOJI_PAIR, is already red on this system... leave it as it is." That implies it must still exist after my changes → I must preserve it. So I need its source. Perhaps read_object returns it? Let me try reading and see. If not, maybe there's a naming convention: test classes might be in separate classes? "Unit tests live in the testclasses include of a class." So ltcl_ classes in the include.
+
+I'll try read_object for ZCL_PIA_00_JSON_UTIL — already did; it returned only main. Hmm, so I can't see testclasses. Maybe I can create tests in a class whose testclasses I can safely define fresh — e.g., put the new test into testclasses of ZCL_PIA_00_LLM_HTTP. But that class might already have tests that I'd overwrite... Unknown.
+
+Alternative: create a brand-new class? The write_source tool takes a class name — maybe it can create a new class? Possibly not. Let me think: the safest approach is to write testclasses for ZCL_PIA_00_LLM_HTTP including a reproduction test. If LLM_HTTP already has tests, overwriting loses them. Hmm.
+
+Actually, maybe read_object does include the testclasses but these classes simply have none? For JSON_UTIL, ESCAPE_EMOJI_PAIR exists somewhere — likely in JSON_UTIL's testclasses. Since read_object didn't show it, read_object only returns the main include. So JSON_UTIL has tests I can't see.
+
+Hmm. Let me try reading a likely test class name? Test classes are local (ltcl_*), not global objects, so read_object won't find them.
+
+Options:
+1. Write new testclasses include for ZCL_PIA_00_LLM_HTTP with my reproduction test. Risk: clobbering existing tests there.
+2. Try to see if write_source to testclasses merges? Unlikely — "Provide the complete source".
+
+The user's instruction: "write an ABAP Unit test that reproduces it and is red". They also mention ESCAPE_EMOJI_PAIR is red and to leave it — that's a hint that run_tests will show it red and I shouldn't panic or "fix" it. It's probably in JSON_UTIL testclasses.
+
+Given the tool constraints, I think the intended workflow is: write the test into the testclasses include of the class being fixed (JSON_UTIL or LLM_HTTP), and the grader knows existing tests. Since I can't read them, maybe the system's write_source to testclasses replaces, and the intended solution is to put tests in LLM_HTTP testclasses... but existing ESCAPE_EMOJI_PAIR must be preserved — it's in JSON_UTIL, a different class, so if I write tests only in LLM_HTTP's testclasses include, JSON_UTIL's tests remain untouched. But if LLM_HTTP already has its own tests, I'd clobber them.
+
+Hmm, is there a way to discover? run_tests on ZCL_PIA_00_LLM_HTTP would report pass/fail counts — if there are existing tests, counts > 0 tells me something exists. Let me run tests on both classes first to see the current state. That's a safe read-only-ish operation. Actually run_tests runs on published active code; fine.
+
+Let me run tests for ZCL_PIA_00_LLM_HTTP and ZCL_PIA_00_JSON_UTIL to see what exists. That informs where ESCAPE_EMOJI_PAIR lives (it'll be red) and whether LLM_HTTP has tests.
+
+Plan:
+1. run_tests ZCL_PIA_00_JSON_UTIL and ZCL_PIA_00_LLM_HTTP (parallel).
+2. Based on counts, decide where to add the test.
+
+If LLM_HTTP has tests I can't read... I'd have to reconstruct them? That's bad. Alternative: put my new test into JSON_UTIL's testclasses — but then I clobber ESCAPE_EMOJI_PAIR which must stay. Unless... I recreate it? I don't know its exact source. But the user says "leave it as it is" — recreating it approximately might change it. Risky.
+
+Better: maybe there's a class specifically for tests? Let me look at the registry/tools? Hmm.
+
+Actually — maybe read_object CAN return testclasses if... no, description says main include.
+
+Let me just run the tests first and see. If LLM_HTTP shows 0 tests, I'll add my test there safely.
+
+Let me also double check the executor to understand how calls are used, though not strictly needed. The bug is in parsing. The report says "PIA runs only the first call" — because the second is lost in parsing. And "Its arguments arrive with extra text after the JSON" — because extract_balanced overran. Both fixed by string-aware scanning.
+
+Wait, actually let me re-check: with two calls, entry 1 = {...arguments with unbalanced '{' inside..., "status":"completed"}, entry 2 = {...}. extract_balanced for entry1's arguments: starts at content `{`, depth goes 1 → the literal `{` makes 2 → arguments' closing `}` → 1 → continues into `","call_id":"c1","status":"completed"}` → the final `}` → 0. So arguments = `{...}","call_id":"c1","status":"completed"}` — matches report exactly ("extra text after the JSON (","call_id":"c1","status":"completed"})").
+
+And split_entries: entry 1 starts at `{`; literal `{` → depth 2 at... wait order: depth 1 at start; inside arguments content there's the outer `{` of arguments → depth 2; literal `{` → depth 3; arguments close `}` → 2; ... entry1 close `}` → 1... hmm let me recount. Entry1: `{ "type":..., "arguments":"{ ... '{' ... }", "status":"completed" }`. Braces in entry1 text: entry-open `{` (d1), arguments-open `{` (d2), literal `{` (d3), arguments-close `}` (d2), entry-close `}` (d1) — not zero! So scanning continues into entry2: `{` (d2) ... `}` (d1)? Wait entry2 also has arguments with braces... In the general case entry2 is balanced: entry2-open `{` d2, args-open `{` d3, args-close `}` d2, entry2-close `}` d1. Still not 0! Hmm. Then it continues to end of array, depth > 0 → lv_end = lv_len_arr - 1, so ONE entry = whole rest → only 1 call parsed, second lost. Yes: "PIA runs only the first call... the second call is lost." And the name extracted for entry1 is fine, arguments overran. Matches perfectly.
+
+Note the interplay: even if extract_balanced were fixed, split_entries would still merge entries. Both need the string-aware fix.
+
+Now implement:
+
+In split_entries: track in-string state:
+```
+WHILE lv_pos < lv_len_arr.
+  FIND FIRST '{' ... (start)
+  depth = 1, in_str = abap_false
+  lv_end = lv_start
+  WHILE lv_end < len-1 AND depth > 0.
+    lv_end++.
+    ch = iv_arr+lv_end(1).
+    IF in_str.
+      IF ch = `\`. lv_end = lv_end + 1. " skip escaped char — careful with loop increment
+      ELSEIF ch = `"`. in_str = false.
+      ENDIF.
+    ELSE.
+      IF ch = `"`. in_str = true.
+      ELSEIF ch = `{`. depth++.
+      ELSEIF ch = `}`. depth--.
+      ENDIF.
+    ENDIF.
+  ENDWHILE.
+```
+Careful: when in string and ch = `\`, skip next char: since loop does lv_end = lv_end + 1 at top, I can just do lv_end = lv_end + 1 extra inside. That's fine in ABAP WHILE.
+
+Hmm, but wait: the FIND FIRST '{' for the start — the `{` could be inside a string? At top level of an array, entries start with `{` outside strings. Before an entry, we're outside strings (position after previous entry's `}`). Except after my fix the previous entry ends exactly at its `}`. OK fine. But to be safe, the start search is fine.
+
+Edge: escape at very end — clamped by WHILE condition.
+
+In extract_balanced: after finding key and first open char — hmm, one subtlety: the first `{` after the key could be inside a string if the value is a string that contains `{` before... e.g. `"arguments":"{'x'..."` — the content itself starts with `{` typically. But consider `"output":[...]` for arrays: first `[` after key. Fine.
+
+But consider key = 'arguments', the search `FIND FIRST OCCURRENCE OF iv_open IN lv_rest` — lv_rest starts at the key. Characters between: `":"` then content. The first `{` is the content's opening brace. Good. But what if a preceding field's value contains the text `"arguments"`? FIND lv_pat IN iv_json finds first occurrence of `"arguments"` anywhere — could be inside a string value (e.g., the source code contains the word arguments in a JSON string?). Existing behavior; keep. Actually for robustness I could keep as is — don't overengineer; but the scan itself must be string aware:
+
+```
+depth = 1, pos = lv_start, in_str = false
+WHILE pos < strlen(lv_rest) - 1 AND depth > 0.
+  pos++.
+  ch = lv_rest+pos(1).
+  IF in_str.
+    IF ch = `\`. pos = pos + 1.
+    ELSEIF ch = `"`. in_str = false.
+    ENDIF.
+  ELSE.
+    IF ch = `"`. in_str = true.
+    ELSEIF ch = iv_open. depth++.
+    ELSEIF ch = iv_close. depth--.
+    ENDIF.
+  ENDIF.
+ENDWHILE.
+```
+
+Wait — but there's a catch for extract_balanced with arguments: the value is a JSON string `"{\"name\"...}"`. The content braces are inside a JSON string at the OUTER level! Hmm. Let's think: entry text = `..."arguments":"{\"name\":\"Z\",\"source\":\"...'{...'...\"}"...`. The scan starts at the content's `{` (which is inside the outer JSON string). As we scan, we encounter `\"` sequences — with my in_str logic: at start in_str = false; first char after `{` is `"` → in_str = true; then `\` → skip next (`"`); then `name` ... then `\` `"` → the `\` sets skip, so the `"` doesn't close the string... Hmm wait: inside the outer JSON string, every `"` is escaped as `\"`. So with in_str logic: `"` opens in_str; then `\` causes skip of next char; sequences of letters; then `\` skips `"`; ... The in_str stays true until an unescaped `"`. The arguments content's own quotes are all `\"` (escaped) — the only unescaped `"` is the one closing the arguments value at the very end: `...\"}"` — hmm: content = `{\"name\":...}` then closing `"` of the outer string. So the `}` (arguments close) appears BEFORE the closing `"`. With my logic: `{` at start (depth 1); `"` → in_str = true; then everything is in_str until unescaped `"`; the content `{` (literal in source, e.g. `lv_open = '{'.`) — but wait, in the raw JSON, within the source string, a `'` is just `'`, and `{` is raw `{`. So while in_str = true, braces are ignored — good, the literal `{` is ignored. The arguments closing `}` — is it inside in_str? Sequence: ...source content...\ (escape) " (closes source string inside content) , " (opens next...) hmm this is getting complicated because the content is itself JSON with strings.
+
+Let me carefully write the raw text. Content JSON (what the model sends as arguments string):
+`{"name":"ZCL_X","source":"CLASS z... lv_open = '{'. ..."}`
+In the outer JSON, this string is encoded by escaping `"` → `\"`:
+`"arguments":"{\"name\":\"ZCL_X\",\"source\":\"CLASS z... lv_open = '{'. ...\"}"`
+
+So the raw char sequence after `"arguments":` is:
+`"` `{` `\` `"` `n` `a` `m` `e` `\` `"` `:` `\` `"` `Z` ... `'` `{` `'` ... `\` `"` `}` `"`
+
+Scan with my logic starting at the content `{` (depth=1, in_str=false):
+- `{` start, depth 1.
+- `"` → in_str = true.
+- `\` → skip next char (the `"`).
+- `name` — letters, in_str still true.
+- `\` → skip `"` (this pair is `\"` closing the name string in content).
+- `:` etc.
+- `\` `"` pairs skipped.
+- ... the literal `{` inside source: we're in_str=true (inside `\"...\"`) → ignored.
+- `\` `"` → skipped (closing of source string in content).
+- `}` → in_str is false now! depth → 0. Scan stops at the arguments closing `}`.
+
+So the extraction returns exactly `{\"name\"...\"}` — the full arguments content including the outer quotes? No: rv_ = lv_rest+lv_start(lv_len) where lv_start is the content `{` — so it returns `{\"name\"...\"}` without the surrounding quotes. Then unescape gives `{"name":...}` — correct JSON.
+
+The in_str toggling works because escaped quotes `\"` are skipped. And braces inside content strings are ignored because we're "in_str" during them. And nested content objects `{` inside content but outside content-strings — e.g. if arguments had a nested object `{"a":{"b":1}}` → raw: `{\"a\":{\"b\":1}}`: `{` d1, `"` in_str, `\"` skipped... `:` then `{` — are we in_str? After `\` `"` (closing "a" string) skipped... let me trace `{\"a\":{\"b\":1}}`: chars: `{` d1; `"` instr; `\`skip`"`; `a`; `\`skip`"`; `:`; `{` → in_str? We're still in_str=true! Because the `"` after `\` was skipped, so in_str never closed. Uh-oh. That breaks nested objects in arguments!
+
+Hmm. The problem: my state machine treats the whole content as one string because inner quotes are escaped. The `\"` escape-skip logic means in_str never turns off inside the content. So a nested `{` in content (outside content-strings) would be wrongly ignored → depth miscount → extraction too short/long.
+
+Wait, but does the current un-fixed code handle nested? Currently without string-awareness: `{\"a\":{\"b\":1}}` → `{` d1, `{` d2, `}` d1, `}` d0 → returns whole. Correct by luck. With my naive in_str fix: `{` d1; `"` in_str=true; then `\`+`"` skip... `:` ; `{` ignored (in_str); `\"` skip... `1`; `}` ignored? Let's see: after `{\"a\":{` comes `\"b\":1}` — `\` skip `"`, `b`, `\` skip `"`, `:1`, `}` — in_str still true → ignored! then `}` final → still in_str → ignored. End of string → depth still 1 → lv_pos = strlen-1 → returns everything to end. That's wrong (overruns).
+
+Hmm wait, actually — does it return everything? WHILE condition pos < strlen-1; loop ends at pos = strlen(lv_rest)-1, depth>0 still, rv_ = from lv_start to end of lv_rest. For arguments being the last field, lv_rest ends at `}"` + rest of entry. Overrun. Bad.
+
+So naive in_str breaks nested braces in arguments. Need better approach: treat `\"` as a quote toggle too? Think about what we're scanning: the raw JSON where the arguments content quotes appear as `\"`. The correct model: we want to count braces of the INNER JSON (the content), where inner quotes are the `\"` pairs. So the rule should be: a `"` preceded by `\` is an inner quote (toggles inner-string state); a `"` NOT preceded by `\` is an outer quote (we're inside the outer string, where braces don't count... but actually we START inside the outer string).
+
+Alternative cleaner approach: count braces only for characters not inside the inner JSON strings, where inner strings are delimited by `\"`...`\"`. I.e., toggle state on the two-char sequence `\"`.
+
+Let me define: scan from lv_start (the content `{`). State: in_inner_str. When we see `\` followed by `"` → toggle in_inner_str, advance 2. When we see `"` (unescaped) → this is the outer string's closing quote → we are leaving the arguments value; but that shouldn't happen before the matching `}` of the content... Actually the content's closing `}` always comes before the outer `"` (content is balanced JSON). So upon unescaped `"`, we can just stop? Or treat as end.
+
+Hmm, but hold on — is extract_balanced used in contexts where the value is NOT a string? Yes! For `tool_calls` array (open `[`, close `]`) — that's a real JSON array, not a string. And `output` array in responses. And `function` object in flatten_tools. For those, values inside are normal JSON with normal quotes. So the scanning rule needs to work for both:
+- Case A (array/object value): quotes are normal `"`...`"`, braces inside strings ignored.
+- Case B (string value containing JSON, like arguments): inner quotes are `\"`, and the outer delimiters are plain `"`.
+
+Unified rule: maintain a string-state that toggles on `"` when NOT preceded by `\`, AND ALSO toggles on `\"`? No...
+
+Let me think again. Actually a unified approach that works for both: track escape prefix. When scanning char by char:
+- If previous char is `\` (i.e., current char is escaped): if current char is `"`, it's an escaped quote — in case A it's inside a string (stay in string), in case B it's a delimiter of an inner string. Hmm, in case B, when we start at the content `{`, we are INSIDE the outer string. Inner string delimiters are `\"`. So state transitions in case B happen exactly on `\"` sequences. In case A, transitions happen on `"` not preceded by `\`.
+
+So the difference: in case B, escaped quotes toggle; in case A, unescaped quotes toggle. Can't distinguish locally... unless: in case B, we start inside a string (the outer one). Hmm — what if the rule is: a `\"` toggles "inner" state, and an unescaped `"` also toggles? In case B: start in outer string. First `\"` toggles inner=true (entering "name" string). The closing `\"` of name toggles inner=false. An unescaped `"` would be the outer close — occurs only after content ends. In case B we never encounter unescaped `"` before the end. In case A: unescaped `"` toggles; `\"` inside strings — toggles wrongly!
+
+Case A example: `{"function":{"name":"a\"b"}}` — hmm wait, would `\"` appear inside? `{"name":"a\"b"}` — scanning the object: `{` d1; `"` → toggle s=true; `name`; `"` → s=false; `:`; `"` s=true; `a`; `\` + `"` — if `\"` toggles → s=false — WRONG, still inside the value string.
+
+So a single pass can't distinguish. Hmm.
+
+BUT: do we need case B at all for extract_balanced? Its uses:
+1. parse_calls_chat: `tool_calls` array (case A), then per entry `arguments` (case B).
+2. parse_calls_responses: `output` array (case A), per entry `arguments` (case B).
+3. flatten_tools: `function` object (case A).
+4. build_input_items: `tool_calls` (case A).
+5. chat answer: `output` array (case A).
+
+So case B is only for `arguments` with open `{` close `}`. Option: give extract_balanced a new optional parameter, e.g. `iv_value_is_string` (or handle generically: when the first non-space char after the key's colon is `"`, then the value is a string → scan for inner JSON with `\"` toggles). That's clean and generic! Look at the char right after `key":` — if it's `"`, it's a string value; the inner content braces are escaped-quoted.
+
+Hmm, wait. Actually simpler idea: for the arguments case, instead of brace counting on raw text, we could extract the string value with extract_str (`"arguments"\s*:\s*"..."` PCRE handles escapes) and then unescape it. That's exactly what build_input_items does: `extract_str( iv_json = lv_e iv_name = 'arguments' )` which returns the ESCAPED string content, then... it re-embeds it. And in chat parsing, unescape(extract_balanced(...)) is used. Note extract_str's PCRE `((?:[^"\\]|\\.)*)` correctly matches a JSON string with escapes. So for arguments: `ls-arguments = unescape( extract_str( iv_json = lv_e iv_name = 'arguments' ) )`. That handles the `'{''` case perfectly! And the braces never need counting.
+
+Wait but careful: extract_str returns the raw escaped content; unescape converts `\"` → `"`, `\n` → newline, etc. That yields the actual arguments JSON string. That's simpler and more robust than balanced scanning.
+
+Hmm, but is there a reason they used extract_balanced for arguments? Maybe because arguments may be very long and PCRE... The PCRE FIND with submatches on long strings should be fine. Or maybe because unescape of `\"` etc. Both approaches unescape. Actually wait — current code does `unescape( extract_balanced(...) )` — extract_balanced returns `{\"name\"...}` raw with escapes, then unescape. extract_str returns the same raw escaped content `{\"name\"...}` (without needing brace counting), then unescape. Same result, but robust. 
+
+One difference: if arguments were sent as an actual JSON object (not a string) — some providers? OpenAI sends arguments as a string. extract_balanced would handle an object value; extract_str would fail. The mock/replay uses the same code. Hmm, risk: executor's mock LLM? Let me check if there's a mock that builds responses with arguments as object. Let me look at the executor and tools to see. Also ZCL_PIA_15_T_* tools and the mock. Let me check zcl_pia_00_executor quickly and any test double for llm.
+
+Actually, to be safe, I can do: try extract_str first; if empty, fall back to extract_balanced (fixed version). But minimal, clean fix is better.
+
+But we still MUST fix split_entries (entries merging) — that's where the second call is lost. And extract_balanced is also used for arrays (case A) where string-awareness is needed too: e.g. the `output` array containing a message item whose text contains `'{'`? For arrays: `"output":[{...,"arguments":"... '{' ..."},{...}]` — split_entries on the array content must not count braces inside strings. So split_entries needs case-A string awareness (normal quotes with escapes). That's straightforward: toggle on unescaped `"`, skip `\X`.
+
+And extract_balanced for arrays/objects (case A) also needs it: e.g. extracting `output` array — brace/bracket counting could be fooled by `[` or `{` inside string values. E.g. an output_text containing `'{'`... for `[`/`]` counting, a `{` inside a string doesn't matter unless it's `[`/`]`. Text with `[` in it (like ABAP internal table decl?) could break it. So yes, fix extract_balanced for case A with standard string awareness (toggle on unescaped `"`).
+
+For case B (arguments), use extract_str. But extract_balanced signature stays; I'll fix its scanning to be string-aware (case A), and change the arguments extraction in parse_calls_chat/parse_calls_responses to use extract_str. Hmm — but wait: would extract_str-based arguments change behavior for the replay path or executor? The executor stores arguments and passes to tools. Let me check the executor to be sure about how it re-parses arguments.
+
+Also `ev_assistant_raw` building uses escape(arguments) — fine.
+
+And build_input_items uses extract_str for arguments already — consistent.
+
+Now the fix locations:
+1. `zcl_pia_00_json_util=>split_entries` — string-aware brace counting.
+2. `zcl_pia_00_json_util=>extract_balanced` — string-aware counting (case A: normal quotes).
+3. `zcl_pia_00_llm_http=>parse_calls_chat` and `parse_calls_responses` — arguments via extract_str + unescape (fallback to balanced if empty?). I'll do: extract_str; if initial, use extract_balanced (for object-valued arguments robustness).
+
+Now the test. Where to put it? Let me first run_tests on both classes to see existing test counts, and read the executor to be thorough. Let me do: read_object ZCL_PIA_00_EXECUTOR + run_tests ZCL_PIA_00_JSON_UTIL + run_tests ZCL_PIA_00_LLM_HTTP in parallel. Hmm, run_tests might be heavy but fine.
+
+Actually wait — there's a concern: run_tests runs on published active code; ESCAPE_EMOJI_PAIR is red currently, expected. Fine.
+
+Let me also consider: maybe the test should reproduce at the parse_calls_responses level (two calls, first has `'{''` in source): assert lines( rt_ ) = 2 and rt_[1]-arguments equals expected JSON. That's the user-level reproduction. Plus maybe split_entries unit test. I'll write the test in LLM_HTTP's testclasses (if empty) — need to check first.
+
+Let me fire the parallel calls.
+
+iters=7 tools=7
