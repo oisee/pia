@@ -112,8 +112,10 @@ CLASS zcl_pia_00_executor IMPLEMENTATION.
 
         DATA lv_out TYPE string.
         lv_out = ls_result-output.
-        IF strlen( lv_out ) > 8000.
-          lv_out = lv_out+0(8000) && '...[truncated]'.
+        " 8000 cut PIA's own larger classes (json_util, llm_http) in read_object, so the agent could not
+        " write them back in full (found by the first F1 run); 60000 still bounds a runaway tool
+        IF strlen( lv_out ) > 60000.
+          lv_out = lv_out+0(60000) && '...[truncated]'.
         ENDIF.
 
         mo_session->push_message(

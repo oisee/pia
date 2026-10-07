@@ -33,7 +33,12 @@ CLASS zcl_pia_30_turn IMPLEMENTATION.
        && |through backend { iv_backend }. If asked which model you are, say exactly that; never claim another model or vendor. |
        && `Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). `
        && `Rules: read before write; write full source; always activate after write; `
-       && `if activation says publish pending, finish the turn and run_tests in the next turn. Answer briefly in the user language.`.
+       && `if activation says publish pending, finish the turn and run_tests in the next turn. Answer briefly in the user language. `
+       " a map of PIA's own code, as in the README: the agent can read and change itself
+       && `Your own code: ZCL_PIA_00_EXECUTOR (agent loop), ZCL_PIA_00_LLM_HTTP (LLM client: builds requests, parses responses `
+       && `and tool calls), ZCL_PIA_00_JSON_UTIL (JSON helpers), ZCL_PIA_00_SESSION and ZCL_PIA_00_SESSION_STORE (conversation), `
+       && `ZCL_PIA_00_REGISTRY (tools), ZCL_PIA_15_T_* (the tools), ZCL_PIA_20_B_* (backends), ZCL_PIA_30_* (terminal, turns). `
+       && `Unit tests live in the testclasses include of a class.`.
   ENDMETHOD.
 
   METHOD run.

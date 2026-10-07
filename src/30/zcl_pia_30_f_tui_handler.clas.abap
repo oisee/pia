@@ -34,6 +34,10 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'const VERBS=["Thinking","Reading","Pondering","Transpiling","Activating","Consulting DDIC",' TO lv.
     APPEND '"Weighing ABAP","Checking syntax","Tinkering","Finagling"];' TO lv.
     APPEND 'let st=null,queued=[];' TO lv.
+    " /auto <task>: no human between turns. The task gets a fixed tail; after each turn the client sends
+    " the same content-free AUTO_NEXT until an answer ends with PIA-DONE or AUTO_MAX turns have run
+    APPEND 'let auto=null;const AUTO_MAX=12,AUTO_NEXT="Continue with the task.",' TO lv.
+    APPEND 'AUTO_TAIL=" Work on it on your own, turn after turn, until it is done. End your final answer with the line PIA-DONE.";' TO lv.
     " session id kept in the browser so a conversation survives reconnects; /new starts a fresh one
     APPEND 'function newSid(){const a="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";let s="";for(let i=0;i<22;i++)s+=a[Math.floor(Math.random()*36)];' TO lv.
     APPEND 'try{localStorage.setItem("pia-sid",s)}catch(e){}return s}' TO lv.
@@ -59,6 +63,9 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'function sendNow(t){if(!(ws&&ws.readyState===1))return false;clearFooter();term.write(P+t+"\r\n");' TO lv.
     APPEND 'ws.send(t);st={t0:Date.now(),f:0,n:0,b:0,v:Math.floor(Math.random()*VERBS.length)};st.h=setInterval(tick,120);drawFooter();return true}' TO lv.
     APPEND 'function done(){if(!st)return;clearFooter();clearInterval(st.h);st=null;' TO lv.
+    APPEND 'if(auto){const fin=/PIA-DONE/.test(auto.txt);auto.txt="";if(fin||auto.left<=0){' TO lv.
+    APPEND 'above("\x1b[2mauto: "+(fin?"done":"stopped after "+AUTO_MAX+" turns")+"\x1b[0m");auto=null;if(!queued.length)return}' TO lv.
+    APPEND 'else{auto.left--;sendNow(AUTO_NEXT);return}}' TO lv.
     APPEND 'if(queued.length){sendNow(queued.shift())}else drawFooter()}' TO lv.
     APPEND 'function connect(){' TO lv.
     APPEND 'const url=(location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+APC+"?sid="+sid;' TO lv.
@@ -66,7 +73,7 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'ws=new WebSocket(url);' TO lv.
     APPEND 'ws.onopen=()=>{term.write("\x1b[32mConnected\x1b[0m\r\n\r\n");drawFooter()};' TO lv.
     APPEND 'ws.onmessage=(e)=>{let d=e.data;const fin=d.includes(DONE);d=d.split(DONE).join("");' TO lv.
-    APPEND 'if(st){st.n++;st.b+=d.length}if(d)above(d);if(fin)done()};' TO lv.
+    APPEND 'if(st){st.n++;st.b+=d.length}if(auto)auto.txt+=d;if(d)above(d);if(fin)done()};' TO lv.
     APPEND 'ws.onclose=()=>{clearFooter();if(st){clearInterval(st.h);st=null}' TO lv.
     APPEND 'term.write("\x1b[31mDisconnected\x1b[0m\r\n");ws=null;setTimeout(connect,3000)};' TO lv.
     APPEND '}' TO lv.
@@ -92,6 +99,7 @@ CLASS zcl_pia_30_f_tui_handler IMPLEMENTATION.
     APPEND 'term.onData((data)=>{' TO lv.
     APPEND 'if(data==="\r"){const t=input.trim();clearIn();input="";if(!t){term.write(P);return}' TO lv.
     APPEND 'remember(t);' TO lv.
+    APPEND 'if(t.startsWith("/auto ")&&!st){auto={left:AUTO_MAX-1,txt:""};sendNow(t.slice(6)+AUTO_TAIL);return}' TO lv.
     APPEND 'if(t==="/new"&&!st){sid=newSid();above("\x1b[2mnew session "+sid+"\x1b[0m");if(ws)ws.close();return}' TO lv.
     APPEND 'if(st){queued.push(t);above("\x1b[2m  queued: "+t+"\x1b[0m")}else if(!sendNow(t)){input=t;term.write(P+t)}}' TO lv.
     APPEND 'else if(data==="\x7f"){if(input.length>0){clearIn();input=input.slice(0,-1);term.write(P+input)}}' TO lv.

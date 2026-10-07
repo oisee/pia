@@ -1,0 +1,1 @@
+Run the tests of ZCL_PIA_DEMO.
