@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+X-OSD-Generation: 7a68c5ffe680388b
+x-osd-served-by: HOST
+Set-Cookie: sap-contextid=70708f34984f42559f8ad0f7; Path=/sap/bc/adt; HttpOnly; SameSite=Strict
+Set-Cookie: SAP_SESSIONID_OSD_001=70708f34984f42559f8ad0f7; Path=/; HttpOnly; SameSite=Strict
+x-csrf-token: xBCUpUuKRaCGD7b3a8RP-qk5
+X-OSD-Build: failed; check_syntax, Attribute or constant "quit" not found in "cl_abap_unit_assert", zcl_pia_00_json_util.clas.testclasses.abap:241 check_syntax, Attribute or constant "quit" not found in "cl_abap_unit_assert", zcl_pia_00_json_util.clas.testclasses.abap:248 check_syntax, Attribute or constant "qui
+Content-Type: application/xml; charset=utf-8
+Content-Length: 1267
+Date: Wed, 07 Oct 2026 12:27:37 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
