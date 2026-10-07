@@ -1,0 +1,125 @@
+Connecting...
+Connected
+
+PIA - pi, writing itself in ABAP
+Tools: read/write/activate/run_tests · backend OSG-STORE · turns inline · live events on
+session 72CRPWG14LRFEYAZYQ5V21 · /new starts a fresh one
+Type a task and press Enter
+
+> Bug report: an administrator wrote pia.env exactly as the README shows it, with a comment after the value, for example PIA_MODEL=glm-5
+.3 # optional and PIA_TURN_MODE=job # optional: job | daemon | inline. After that PIA asks z.ai for a model named "glm-5.3 # optional", 
+and the turn mode setting is ignored. Find the cause in your own code, write an ABAP Unit test that reproduces it and is red, then fix t
+he code and show the tests green. Work on it on your own, turn after turn, until it is done. End your final answer with the line PIA-DON
+E.
+  > read_object {"name":"ZCL_PIA_00_CONFIG"}
+  < read_object ok
+  > read_object {"include":"testclasses","name":"ZCL_PIA_00_CONFIG"}
+  < read_object ok
+  > write_source {"include":"main","name":"ZCL_PIA_00_CONFIG","source":"CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.\n
+\n  PUBLIC SECTION.\n    \" ...
+  < write_source ok
+  > write_source {"include":"testclasses","name":"ZCL_PIA_00_CONFIG","source":"CLASS ltcl_config DEFINITION FINAL FOR TESTING\n  DURATIO
+N SHORT RISK LEVEL HARMLESS....
+  < write_source ok
+  > activate {"name":"ZCL_PIA_00_CONFIG"}
+  < activate ok
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests FA
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests FA
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests FA
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests FA
+
+MAX ITERATIONS REACHED
+
+iters=8 tools=9
+> Continue with the task.
+Disconnected
+Connecting...
+Connected
+
+PIA - pi, writing itself in ABAP
+Tools: read/write/activate/run_tests · backend OSG-STORE · turns inline · live events on
+session 72CRPWG14LRFEYAZYQ5V21 · resumed, 19 earlier messages · /new starts a fresh one
+Type a task and press Enter
+
+> Bug report: an administrator wrote pia.env exactly as the README shows it, with a comment after the value, for example PIA_MODEL=glm-5
+.3 # optional and PIA_TURN_MODE=job # optional: job | daemon | inline. After that PIA asks z.ai for a model named "glm-5.3 # optional", 
+and the turn mode setting is ignored. Find the cause in your own code, write an ABAP Unit test that reproduces it and is red, then fix t
+he code and show the tests green. Work on it on your own, turn after turn, until it is done. End your final answer with the line PIA-DON
+E.
+───
+
+auto: reconnected, continuing
+> Continue with the task.
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests ok
+  > write_method {"name":"ZCL_PIA_00_CONFIG","method":"value_of_line","source":"  METHOD value_of_line.\n    \" value part of a NAME=val
+ue line: cut everything from...
+  < write_method ok
+  > activate {"name":"ZCL_PIA_00_CONFIG"}
+  < activate FA
+  > read_method {"name":"ZCL_PIA_00_CONFIG","method":"value_of_line"}
+  < read_method FA
+  > outline {"name":"ZCL_PIA_00_CONFIG"}
+  < outline ok
+  > read_object {"name":"ZCL_PIA_00_CONFIG"}
+  < read_object ok
+  > write_source {"include":"main","name":"ZCL_PIA_00_CONFIG","source":"CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.\n
+\n  PUBLIC SECTION.\n    \" ...
+  < write_source ok
+  > activate {"name":"ZCL_PIA_00_CONFIG"}
+  < activate ok
+
+MAX ITERATIONS REACHED
+
+iters=8 tools=8
+> Continue with the task.
+Disconnected
+Connecting...
+Connected
+
+PIA - pi, writing itself in ABAP
+Tools: read/write/activate/run_tests · backend OSG-STORE · turns inline · live events on
+session 72CRPWG14LRFEYAZYQ5V21 · resumed, 36 earlier messages · /new starts a fresh one
+Type a task and press Enter
+
+> Bug report: an administrator wrote pia.env exactly as the README shows it, with a comment after the value, for example PIA_MODEL=glm-5
+.3 # optional and PIA_TURN_MODE=job # optional: job | daemon | inline. After that PIA asks z.ai for a model named "glm-5.3 # optional", 
+and the turn mode setting is ignored. Find the cause in your own code, write an ABAP Unit test that reproduces it and is red, then fix t
+he code and show the tests green. Work on it on your own, turn after turn, until it is done. End your final answer with the line PIA-DON
+E.
+> Continue with the task.
+───
+
+auto: reconnected, continuing
+> Continue with the task.
+  > run_tests {"name":"ZCL_PIA_00_CONFIG"}
+  < run_tests ok
+
+Done. Summary of the work:
+
+**Cause** (in `ZCL_PIA_00_CONFIG=>GET_FROM`): the parser split each `pia.env` line at the first `=` and used everything after it verbati
+m as the value. A README-style inline comment therefore became part of the value:
+- `PIA_MODEL=glm-5.3 # optional` → model `glm-5.3 # optional` sent to z.ai
+- `PIA_TURN_MODE=job # optional: job | daemon | inline` → `job # optional: ...`, which matched none of the valid modes, so the setting w
+as ignored.
+
+**Red test**: I extracted the value parsing into a testable private helper `VALUE_OF_LINE` and added local test class `LTCL_CONFIG` with
+ `VALUE_WITH_INLINE_COMMENT` (asserting `glm-5.3` and `job`), `VALUE_PLAIN` and `LINE_WITHOUT_EQUALS`. Result before the fix: **1 fail**
+ (`Expected [glm-5.3] / Actual [glm-5.3 # optional]`), 2 pass.
+
+**Fix** in `VALUE_OF_LINE` (now also used by `GET_FROM`): after cutting at the first `=`, everything from the first blank-hash (` #`) is
+ stripped as an inline comment and the result is `CONDENSE`d. I deliberately cut only at ` #` (not bare `#`) so secrets that legitimatel
+y contain `#` without a leading space stay intact, and values without comments are unchanged.
+
+**Result**: tests now **green** — 3 methods, 3 pass, 0 fail / 0 error. With this, `PIA_MODEL=glm-5.3 # optional` yields model `glm-5.3` 
+and `PIA_TURN_MODE=job # optional: ...` yields `job`, so the turn mode is honored again.
+
+PIA-DONE
+
+iters=2 tools=1
+auto: done
+> 
