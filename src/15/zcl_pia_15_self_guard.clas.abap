@@ -12,8 +12,10 @@ CLASS zcl_pia_15_self_guard DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_include TYPE string OPTIONAL.
 
     " '' when nothing was rolled back; otherwise what failed and what was restored
+    " iv_failure: a failure seen at runtime (e.g. the LLM refused the request): restore without the parse check
     CLASS-METHODS check_and_restore
       IMPORTING io_backend TYPE REF TO zif_pia_20_dev_backend
+                iv_failure TYPE string OPTIONAL
       RETURNING VALUE(rv_) TYPE string.
 
     " the self-check alone: '' when tool calls still parse
@@ -92,7 +94,7 @@ CLASS zcl_pia_15_self_guard IMPLEMENTATION.
     IF lt_index IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lv_fail) = self_check( ).
+    DATA(lv_fail) = COND string( WHEN iv_failure IS NOT INITIAL THEN iv_failure ELSE self_check( ) ).
     IF lv_fail IS INITIAL.
       " the live code still works: the backups are not needed any more
       zcl_pia_00_session_store=>write_lines( iv_file = c_index it_ = VALUE #( ) ).
@@ -114,7 +116,7 @@ CLASS zcl_pia_15_self_guard IMPLEMENTATION.
       io_backend->activate( lv_name ).
     ENDLOOP.
     zcl_pia_00_session_store=>write_lines( iv_file = c_index it_ = VALUE #( ) ).
-    rv_ = |self-check failed after your change to your own code: { lv_fail }. |
+    rv_ = |after your change to your own code: { lv_fail }. |
        && |So that you can work again, the previous versions were written back and activated: { concat_lines_of( table = lt_done sep = `, ` ) }. |
        && `They go live when this turn ends. Make the change again so that tool calls still parse at every step.`.
   ENDMETHOD.
