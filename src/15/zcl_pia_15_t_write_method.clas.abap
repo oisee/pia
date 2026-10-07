@@ -80,8 +80,12 @@ CLASS zcl_pia_15_t_write_method IMPLEMENTATION.
     ENDIF.
     " guard: the reported range must start at this method (open-steamgate reports local test methods in main
     " until its objectstructure parity fix); otherwise refuse instead of overwriting other code
-    IF to_upper( lt_lines[ ls_span-impl_from ] ) NS lv_method.
-      rs_ = fail( |the system's range { ls_span-include } { ls_span-impl_from }-{ ls_span-impl_to } does not start at METHOD { lv_method }: use read_object and write_source| ).
+    " guard: the reported range must be exactly this method's block (the range can come from another version of the
+    " source, e.g. open-steamgate's outline of the published version while the source has unactivated changes)
+    IF to_upper( condense( lt_lines[ ls_span-impl_from ] ) ) NP |METHOD { lv_method }*|
+       OR to_upper( condense( lt_lines[ ls_span-impl_to ] ) ) NP 'ENDMETHOD*'.
+      rs_ = fail( |the system's range { ls_span-include } { ls_span-impl_from }-{ ls_span-impl_to } is not METHOD { lv_method } ... ENDMETHOD |
+               && |in the current source (activate first, or use read_object and write_source)| ).
       RETURN.
     ENDIF.
     DATA(lv_block) = get_arg( iv_name = 'source' iv_arguments = iv_arguments ).

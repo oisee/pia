@@ -72,6 +72,12 @@ CLASS zcl_pia_15_t_read_method IMPLEMENTATION.
       rs_ = fail( |the reported range { ls_span-impl_from }-{ ls_span-impl_to } is outside { ls_span-include } ({ lines( lt_lines ) } lines)| ).
       RETURN.
     ENDIF.
+    IF to_upper( condense( lt_lines[ ls_span-impl_from ] ) ) NP |METHOD { lv_method }*|
+       OR to_upper( condense( lt_lines[ ls_span-impl_to ] ) ) NP 'ENDMETHOD*'.
+      rs_ = fail( |the system's range { ls_span-include } { ls_span-impl_from }-{ ls_span-impl_to } is not METHOD { lv_method } ... ENDMETHOD |
+               && |in the current source (activate first, or use read_object)| ).
+      RETURN.
+    ENDIF.
     DATA lt_block TYPE string_table.
     LOOP AT lt_lines INTO DATA(lv_line) FROM ls_span-impl_from TO ls_span-impl_to.
       APPEND lv_line TO lt_block.
