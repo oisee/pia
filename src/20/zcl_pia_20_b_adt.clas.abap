@@ -343,7 +343,8 @@ CLASS zcl_pia_20_b_adt IMPLEMENTATION.
           ENDIF.
           APPEND |\{"kind":"{ lv_kind }","title":"{ zcl_pia_00_json_util=>escape( xml_text( lv_title ) ) }",|
               && |"expected":"{ zcl_pia_00_json_util=>escape( xml_text( lv_exp ) ) }",|
-              && |"actual":"{ zcl_pia_00_json_util=>escape( xml_text( lv_act ) ) }","line":"{ lv_line }",|
+              && |"actual":"{ zcl_pia_00_json_util=>escape( xml_text( lv_act ) ) }",|
+              && |"line":{ COND string( WHEN lv_line IS INITIAL THEN `null` ELSE lv_line ) },|
               && |"details":[{ concat_lines_of( table = lt_dj sep = `,` ) }]\}| TO lt_aj.
         ENDLOOP.
         lv_methods = lv_methods + 1.
