@@ -27,7 +27,15 @@ await p.click("#terminal");
 await p.evaluate(t => typeText("/auto " + t), task);
 await p.keyboard.press("Enter");
 await p.waitForFunction(() => auto !== null, null, {timeout: 15000});
-await p.waitForFunction(() => auto === null && st === null, null, {timeout: 60 * 60 * 1000, polling: 1000});
+// a screenshot at the end of every turn (for the record and the book)
+let turn = 0, busy = true;
+for (const end = Date.now() + 90 * 60 * 1000; Date.now() < end;) {
+  const s = await p.evaluate(() => ({running: st !== null, auto: auto !== null}));
+  if (busy && !s.running) { turn++; await p.screenshot({path: join(out, `turn-${String(turn).padStart(2, "0")}.png`)}); }
+  busy = s.running;
+  if (!s.auto && !s.running) break;
+  await p.waitForTimeout(1000);
+}
 const text = await p.evaluate(() => { const b = term.buffer.active, o = [];
   for (let i = 0; i < b.length; i++) o.push(b.getLine(i)?.translateToString(true) ?? ""); return o.join("\n"); });
 writeFileSync(join(out, "terminal.txt"), text);
