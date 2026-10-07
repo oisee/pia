@@ -138,6 +138,10 @@ Fixing a real bug in itself without a human prompt per step is the goal after 0.
 
 ## Known limits in 0.1
 
+- On SAP, an abapGit import of the zip can leave the APC handler `ZCL_PIA_30_F_TUI_APC` missing (seen on a fresh
+  install and on `--overwrite`); the terminal then says *Disconnected* (the WebSocket handshake answers 500). Create the
+  class from `src/30/zcl_pia_30_f_tui_apc.clas.abap` (ADT, SE24 or `vsp deploy`) and the terminal works.
+
 - Writes only to classes that already exist, and only in local packages (`$…`).
 - One turn at a time per session; there is no way to cancel a running turn yet.
 - The daemon turn mode (a pre-started ABAP daemon fed over AMC) does not pick up turns yet: use `job`.
