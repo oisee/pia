@@ -21,6 +21,11 @@ CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_name    TYPE string
       RETURNING VALUE(rv_) TYPE string.
 
+    " value part of a NAME=value line (pure helper, for unit tests)
+    CLASS-METHODS value_of_line
+      IMPORTING iv_line    TYPE string
+      RETURNING VALUE(rv_) TYPE string.
+
 ENDCLASS.
 
 CLASS zcl_pia_00_config IMPLEMENTATION.
@@ -43,7 +48,6 @@ CLASS zcl_pia_00_config IMPLEMENTATION.
     DATA lv_line TYPE string.
     DATA lv_key TYPE string.
     DATA lv_off TYPE i.
-    DATA lv_from TYPE i.
 
     TRY.
         OPEN DATASET iv_file FOR INPUT IN TEXT MODE ENCODING UTF-8.
@@ -62,8 +66,7 @@ CLASS zcl_pia_00_config IMPLEMENTATION.
           ENDIF.
           lv_key = substring( val = lv_line len = lv_off ).
           IF lv_key = iv_name.
-            lv_from = lv_off + 1.
-            rv_ = substring( val = lv_line off = lv_from ).
+            rv_ = value_of_line( lv_line ).
             EXIT.
           ENDIF.
         ENDDO.
@@ -71,6 +74,22 @@ CLASS zcl_pia_00_config IMPLEMENTATION.
       CATCH cx_root.
         CLEAR rv_.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD value_of_line.
+    " value part of a NAME=value line: cut everything from the first ' #'
+    " (inline comment) and trim blanks; secrets with '=' are unaffected
+    DATA lv_off TYPE i.
+    FIND FIRST OCCURRENCE OF `=` IN iv_line MATCH OFFSET lv_off.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    rv_ = substring( val = iv_line off = lv_off + 1 ).
+    FIND FIRST OCCURRENCE OF ` #` IN rv_ MATCH OFFSET lv_off.
+    IF sy-subrc = 0.
+      rv_ = substring( val = rv_ len = lv_off ).
+    ENDIF.
+    rv_ = condense( rv_ ).
   ENDMETHOD.
 
 ENDCLASS.
