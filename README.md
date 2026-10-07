@@ -134,7 +134,11 @@ Porting notes from the first SAP install are in `osg-probe/a4h/README.md`.
 PIA's first self-hosting run (October 2026, on open-steamgate): asked to extend its own JSON helper, PIA read
 `ZCL_PIA_00_JSON_UTIL`, added a method, activated it, and the next turn ran on the new code. Its own unit tests
 were drafted by a second agent, checked by a critic, and run through the same `run_tests` tool (30/30 on SAP).
-Fixing a real bug in itself without a human prompt per step is the goal after 0.1 (see the backlog).
+On 2026-10-07 PIA fixed a real bug in itself with no human in the loop (F1). Given only the symptom (a comment in
+`pia.env` leaking into the model name), it found `ZCL_PIA_00_CONFIG`, wrote a red test, fixed the code and saw it green;
+the fix is in the history with PIA as its author ([`12836e7`](https://github.com/oisee/pia/commit/12836e7)).
+The six runs, the eight real failures they found and the human setup are in
+[`reports/2026-10-07-F1.md`](reports/2026-10-07-F1.md).
 
 ## Known limits in 0.1
 
