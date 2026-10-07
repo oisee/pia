@@ -1,5 +1,9 @@
 # PIA — the Pi-ABAP Agent that writes itself
 
+![PIA, told it is featured in a book about how it fixed itself, answers in its terminal](screenshots/featured/featured-en.png)
+
+*A live, unedited turn on glm-5.3, one take: PIA has just read [chapter 19 of the open-steamgate book](https://github.com/oisee/osg-demo/pull/72), which tells [how it fixed a bug in itself](osg-probe/f1/b2-osg). The record of the turn is in [osg-probe/featured](osg-probe/featured).*
+
 **A coding agent written in ABAP that runs inside SAP and reads, writes, activates and unit-tests ABAP classes, including its own.**
 
 You type a task into a terminal in your browser. PIA reads the class, writes the fix, activates it and runs
