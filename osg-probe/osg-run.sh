@@ -15,7 +15,7 @@ sleep 3
 export STG_DB=file STG_DB_PATH="$DB" OSD_ADT_ONE_RUNTIME=1 OSD_WARM=1 \
   OSD_DATASET_READ="$HOME/.config/pia" OSD_DATASET_WRITE="$HOME/.config/pia" OSD_DATASET_HOME="$HOME/.config/pia"
 setsid nohup env OSD_HEAVY_RANGE=20-29 OSD_HEAVY_SLOTS=3 \
-  bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-0.0.0.0} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
+  OSD_HEAVY_TIMEOUT=0 bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-0.0.0.0} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
 # the worker needs the built generation: start it once the server serves
 ( until grep -q "serving generation" "$LOG" 2>/dev/null; do sleep 3; done
   exec node tools/osd-batch-runs.mjs worker > "$LOG.worker" 2>&1 ) > /dev/null 2>&1 &

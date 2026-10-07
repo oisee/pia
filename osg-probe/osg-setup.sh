@@ -28,7 +28,7 @@ OSG="$DIR" "$PIA/osg-probe/deploy-osg-pia.sh"
 LOG=${LOG:-$DIR/.local/osg-pia.log}
 setsid nohup env OSD_HEAVY_RANGE="$RANGE" OSD_HEAVY_SLOTS=3 OSD_ADT_ONE_RUNTIME=1 OSD_WARM=1 \
   OSD_DATASET_READ="$HOME/.config/pia" OSD_DATASET_WRITE="$HOME/.config/pia" OSD_DATASET_HOME="$HOME/.config/pia" \
-  bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-127.0.0.1} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
+  OSD_HEAVY_TIMEOUT=0 bash -c "exec tools/osd-heavy.sh env OSD_BIND=${OSD_BIND:-127.0.0.1} npm start > '$LOG' 2>&1" > /dev/null 2>&1 &
 echo "starting; log: $LOG; the first build takes a few minutes"
 # wait until the generation is served, then take the port from the heavy wrapper's line (STG_PORT=...)
 for i in $(seq 1 300); do grep -q "serving generation" "$LOG" 2>/dev/null && break; sleep 2; done
