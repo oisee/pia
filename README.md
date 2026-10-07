@@ -75,8 +75,9 @@ in-process backend (STORE): tracked activation (`op_id` → `published`), `RUN_T
 warm publishing in ~2.6 s. The development API ([#626](https://github.com/oisee/open-steamgate/pull/626)) is on
 `main`, and so are AMC channel extensions ([#630](https://github.com/oisee/open-steamgate/pull/630)) and push
 channels that survive a warm recycle ([#631](https://github.com/oisee/open-steamgate/pull/631)). The terminal
-needs one more change: publishing at the end of an APC step
-([#636](https://github.com/oisee/open-steamgate/pull/636), 15/15 live and replayed on its head 3c73d3ea).
+also needs publishing at the end of an APC step ([#636](https://github.com/oisee/open-steamgate/pull/636)).
+All of it is in open-steamgate `292a4c60` (stable tag `vscode-stable-v0.7.1696`): the five-turn e2e passes 15/15
+there, live and replayed, with no workarounds. `OSG_REF=<tag>` pins `osg-setup.sh` to it.
 
 `osg-probe/osg-setup.sh` clones open-steamgate, pins the transpiler, deploys PIA and starts it; `osg-run.sh`
 restarts it with background jobs. On open-steamgate a turn runs inline, and an activation goes live when the
@@ -111,7 +112,7 @@ Fixing a real bug in itself without a human prompt per step is the goal after 0.
 - Writes only to classes that already exist, and only in local packages (`$…`).
 - One turn at a time per session; there is no way to cancel a running turn yet.
 - The daemon turn mode (a pre-started ABAP daemon fed over AMC) does not pick up turns yet: use `job`.
-- On open-steamgate the terminal is a preview until #636 (publishing at the end of an APC step) is merged.
+- On open-steamgate the terminal needs `292a4c60` or later.
 
 What comes next is in [`docs/SUPER-BACKLOG.md`](docs/SUPER-BACKLOG.md).
 
