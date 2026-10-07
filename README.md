@@ -77,7 +77,7 @@ warm publishing in ~2.6 s. The development API ([#626](https://github.com/oisee/
 channels that survive a warm recycle ([#631](https://github.com/oisee/open-steamgate/pull/631)). The terminal
 also needs publishing at the end of an APC step ([#636](https://github.com/oisee/open-steamgate/pull/636)).
 All of it is in open-steamgate `292a4c60` (stable tag `vscode-stable-v0.7.1696`): the five-turn e2e passes 15/15
-there, live and replayed, with no workarounds. `OSG_REF=<tag>` pins `osg-setup.sh` to it.
+there, live and replayed, with no workarounds. `osg-setup.sh` checks out that tag (`OSG_REF=main` for the latest).
 
 `osg-probe/osg-setup.sh` clones open-steamgate, pins the transpiler, deploys PIA and starts it; `osg-run.sh`
 restarts it with background jobs. On open-steamgate a turn runs inline, and an activation goes live when the

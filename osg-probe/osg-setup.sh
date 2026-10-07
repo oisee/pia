@@ -1,9 +1,9 @@
 #!/bin/bash
 # Set up an open-steamgate instance for PIA from scratch and start it.
 #   osg-setup.sh [dir] [instance range]   default: ~/dev/osg-pia, 20-29 (the first free instance is taken)
-#   OSG_REF=<tag|commit> pins open-steamgate (default: main); PIA 0.1.1 needs 292a4c60 or later
+#   OSG_REF=<tag|commit|main> picks open-steamgate (default: vscode-stable-v0.7.1696, where PIA 0.1.1 was accepted)
 # Needs: node 22, git, ~/.config/pia/pia.env with ZAI_API_KEY=... (or PIA_LLM=replay:<file>, see README).
-# Steps: clone/update main, npm ci, own copy of the pinned ABAP libraries, the pinned transpiler build
+# Steps: clone, check out OSG_REF, npm ci, own copy of the pinned ABAP libraries, the pinned transpiler build
 # (warm compile), packs, deploy PIA, start with ONE_RUNTIME + warm, PIA's files beside pia.env.
 set -euo pipefail
 DIR=${1:-$HOME/dev/osg-pia}
@@ -15,7 +15,7 @@ mkdir -p "$HOME/.config/pia"
 [ -f "$HOME/.config/pia/pia.env" ] || echo "note: $HOME/.config/pia/pia.env is missing (ZAI_API_KEY=... or PIA_LLM=replay:...)"
 if [ ! -d "$DIR/.git" ]; then git clone https://github.com/oisee/open-steamgate.git "$DIR"; fi
 cd "$DIR"
-REF=${OSG_REF:-main}
+REF=${OSG_REF:-vscode-stable-v0.7.1696}
 git fetch -q --tags origin
 if [ "$REF" = main ]; then git checkout -q main && git pull -q --ff-only origin main; else git checkout -q "$REF"; fi
 echo "open-steamgate $(git log -1 --format='%h %s')"
