@@ -73,8 +73,10 @@ three-language scenario of the e2e test recorded on open-steamgate.
 PIA also runs on [open-steamgate](https://github.com/oisee/open-steamgate), the open ABAP runtime, with an
 in-process backend (STORE): tracked activation (`op_id` → `published`), `RUN_TESTS` on a pinned generation,
 warm publishing in ~2.6 s. The development API ([#626](https://github.com/oisee/open-steamgate/pull/626)) is on
-`main`. The terminal needs two more open-steamgate changes that are not merged yet: AMC channel extensions
-([#630](https://github.com/oisee/open-steamgate/pull/630)) and publishing at the end of an APC step.
+`main`, and so are AMC channel extensions ([#630](https://github.com/oisee/open-steamgate/pull/630)) and push
+channels that survive a warm recycle ([#631](https://github.com/oisee/open-steamgate/pull/631)). The terminal
+needs one more change: publishing at the end of an APC step
+([#636](https://github.com/oisee/open-steamgate/pull/636), 15/15 live and replayed on its head 3c73d3ea).
 
 `osg-probe/osg-setup.sh` clones open-steamgate, pins the transpiler, deploys PIA and starts it; `osg-run.sh`
 restarts it with background jobs. On open-steamgate a turn runs inline, and an activation goes live when the
@@ -109,9 +111,7 @@ Fixing a real bug in itself without a human prompt per step is the goal after 0.
 - Writes only to classes that already exist, and only in local packages (`$…`).
 - One turn at a time per session; there is no way to cancel a running turn yet.
 - The daemon turn mode (a pre-started ABAP daemon fed over AMC) does not pick up turns yet: use `job`.
-- On open-steamgate the terminal is a preview until #630 and the APC step boundary are merged. A warm runtime
-  recycle drops open push channels, also in the middle of a turn; the scripts set `OSD_WARM_QUIET_MS` to a day
-  so that the most frequent trigger (a quiet minute) does not fire.
+- On open-steamgate the terminal is a preview until #636 (publishing at the end of an APC step) is merged.
 
 What comes next is in [`docs/SUPER-BACKLOG.md`](docs/SUPER-BACKLOG.md).
 
