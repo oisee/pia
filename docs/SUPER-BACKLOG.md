@@ -16,9 +16,8 @@ Ideas after 0.1, not yet ordered or promised. Grouped by theme; each line is a s
 - **LLM record / replay** (`PIA_LLM=record:<file>` / `replay:<file>`, on top of zcl_pia_00_llm_mock): deterministic
   runs without a key, for the osg-demo book chapter and for CI; a recorded transcript in the release.
 - abapGit import skipped ZCL_PIA_30_F_TUI_APC in the v0.1.0 zip (decision "add", no error): find out why.
-- **A real JSON parser** instead of brace counting and regexes in ZCL_PIA_00_JSON_UTIL (sXML / CALL TRANSFORMATION
-  or /ui2/cl_json on SAP, ajson on OSG): F1 showed hand parsing lose tool calls when the model's reasoning text has
-  unbalanced brackets (5 of 13 recorded responses).
+- ~~A real JSON parser~~ done (2026-10-07): LLM answers, tool arguments and the session's tool calls are read with
+  sXML (zcl_pia_00_json_util=>to_paths); the bracket-counting helpers remain only for JSON PIA writes itself.
 - **End the turn on "publication pending"** in the executor instead of trusting the model (it retried run_tests until
   the step limit, three times in F1).
 - ~~read_object for the testclasses include~~ done (2026-10-07), with outline / read_method / write_method on the

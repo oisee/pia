@@ -1,6 +1,26 @@
 CLASS zcl_pia_00_json_util DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
+    " a JSON document as path -> value rows, read by sXML (the native JSON reader; open-abap implements it):
+    " {"a":[{"b":"x"}]} gives /a/1/b = x. Strings come decoded. Prefer this to the hand helpers below for
+    " JSON that PIA did not write itself (LLM answers, tool arguments).
+    TYPES: BEGIN OF ts_path_value,
+             path  TYPE string,
+             value TYPE string,
+           END OF ts_path_value.
+    TYPES tt_path_value TYPE STANDARD TABLE OF ts_path_value WITH EMPTY KEY.
+
+    " ev_error is set when the reader rejects the document
+    CLASS-METHODS to_paths
+      IMPORTING iv_json  TYPE string
+      EXPORTING et_      TYPE tt_path_value
+                ev_error TYPE string.
+
+    CLASS-METHODS path_value
+      IMPORTING it_        TYPE tt_path_value
+                iv_path    TYPE string
+      RETURNING VALUE(rv_) TYPE string.
+
     CLASS-METHODS escape
       IMPORTING iv_        TYPE string
       RETURNING VALUE(rv_) TYPE string.
@@ -45,6 +65,71 @@ CLASS zcl_pia_00_json_util DEFINITION PUBLIC FINAL CREATE PUBLIC.
 ENDCLASS.
 
 CLASS zcl_pia_00_json_util IMPLEMENTATION.
+
+  METHOD to_paths.
+    TYPES: BEGIN OF ts_frame,
+             kind  TYPE string,   " object | array | value
+             path  TYPE string,
+             count TYPE i,        " items seen, for an array
+           END OF ts_frame.
+    DATA lt_stack TYPE STANDARD TABLE OF ts_frame WITH EMPTY KEY.
+    DATA lv_key TYPE string.
+    DATA lv_parent TYPE string.
+    CLEAR: et_, ev_error.
+    IF iv_json IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_reader) = cl_sxml_string_reader=>create( cl_abap_codepage=>convert_to( iv_json ) ).
+        DO.
+          DATA(lo_node) = lo_reader->read_next_node( ).
+          IF lo_node IS INITIAL.
+            EXIT.
+          ENDIF.
+          DATA(lv_depth) = lines( lt_stack ).
+          CASE lo_node->type.
+            WHEN if_sxml_node=>co_nt_element_open.
+              DATA(lo_open) = CAST if_sxml_open_element( lo_node ).
+              CLEAR lv_key.
+              LOOP AT lo_open->get_attributes( ) INTO DATA(lo_attr).
+                IF lo_attr->qname-name = 'name'.
+                  lv_key = lo_attr->get_value( ).
+                ENDIF.
+              ENDLOOP.
+              lv_parent = ``.
+              IF lv_depth > 0.
+                lv_parent = lt_stack[ lv_depth ]-path.
+                IF lt_stack[ lv_depth ]-kind = `array`.
+                  lt_stack[ lv_depth ]-count = lt_stack[ lv_depth ]-count + 1.
+                  lv_key = |{ lt_stack[ lv_depth ]-count }|.
+                ENDIF.
+              ENDIF.
+              APPEND VALUE #( kind = COND #( WHEN lo_open->qname-name = 'object' OR lo_open->qname-name = 'array'
+                                             THEN to_lower( lo_open->qname-name ) ELSE `value` )
+                              path = COND #( WHEN lv_depth = 0 THEN `` ELSE lv_parent && `/` && lv_key ) ) TO lt_stack.
+            WHEN if_sxml_node=>co_nt_value.
+              IF lv_depth > 0.
+                APPEND VALUE #( path = lt_stack[ lv_depth ]-path
+                                value = CAST if_sxml_value_node( lo_node )->get_value( ) ) TO et_.
+              ENDIF.
+            WHEN if_sxml_node=>co_nt_element_close.
+              " a close node need not carry its name: the stack knows what closes
+              IF lv_depth > 0.
+                DELETE lt_stack INDEX lv_depth.
+              ENDIF.
+          ENDCASE.
+        ENDDO.
+      CATCH cx_root INTO DATA(lx).
+        ev_error = lx->get_text( ).
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD path_value.
+    READ TABLE it_ INTO DATA(ls) WITH KEY path = iv_path.
+    IF sy-subrc = 0.
+      rv_ = ls-value.
+    ENDIF.
+  ENDMETHOD.
 
   METHOD escape.
     DATA lv_i TYPE i.

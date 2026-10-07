@@ -421,3 +421,44 @@ CLASS ltcl_json_util IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
+CLASS ltcl_paths DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS nested_paths FOR TESTING.
+    METHODS brackets_in_strings FOR TESTING.
+    METHODS escaped_quote FOR TESTING.
+    METHODS invalid_json FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_paths IMPLEMENTATION.
+
+  METHOD nested_paths.
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = `{"a":[{"b":"x"},{"b":"y","n":2}],"c":true}`
+                                    IMPORTING et_ = DATA(lt) ev_error = DATA(lv_err) ).
+    cl_abap_unit_assert=>assert_initial( lv_err ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/a/1/b` ) exp = `x` ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/a/2/b` ) exp = `y` ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/a/2/n` ) exp = `2` ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/c` ) exp = `true` ).
+  ENDMETHOD.
+
+  METHOD brackets_in_strings.
+    " lone brackets and braces inside string values are data, not structure
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = `{"t":"no ] here { either","u":["[",{"v":"}"}]}`
+                                    IMPORTING et_ = DATA(lt) ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/t` ) exp = `no ] here { either` ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/u/1` ) exp = `[` ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/u/2/v` ) exp = `}` ).
+  ENDMETHOD.
+
+  METHOD escaped_quote.
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = `{"s":"a \"q\" b\\c"}` IMPORTING et_ = DATA(lt) ).
+    cl_abap_unit_assert=>assert_equals( act = zcl_pia_00_json_util=>path_value( it_ = lt iv_path = `/s` ) exp = `a "q" b\c` ).
+  ENDMETHOD.
+
+  METHOD invalid_json.
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = `{"a":` IMPORTING ev_error = DATA(lv_err) ).
+    cl_abap_unit_assert=>assert_not_initial( lv_err ).
+  ENDMETHOD.
+
+ENDCLASS.

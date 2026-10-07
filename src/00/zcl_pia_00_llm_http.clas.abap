@@ -46,35 +46,28 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
 
 
   METHOD parse_calls_chat.
-    DATA(lv_arr) = zcl_pia_00_json_util=>extract_balanced(
-      iv_json = iv_body iv_key = 'tool_calls' iv_open = '[' iv_close = ']' ).
-    LOOP AT zcl_pia_00_json_util=>split_entries( lv_arr ) INTO DATA(lv_e).
-      DATA ls TYPE zif_pia_00_tool=>ts_call.
-      ls-id = zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'id' ).
-      ls-name = zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'name' ).
-      ls-arguments = zcl_pia_00_json_util=>unescape( zcl_pia_00_json_util=>extract_balanced(
-                       iv_json = lv_e iv_key = 'arguments' iv_open = '{' iv_close = '}' ) ).
-      IF ls-name IS NOT INITIAL.
-        APPEND ls TO rt_.
-      ENDIF.
+    " the JSON is read by sXML (zcl_pia_00_json_util=>to_paths); strings come decoded
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = iv_body IMPORTING et_ = DATA(lt_pv) ).
+    DATA(lv_base) = `/choices/1/message/tool_calls/`.
+    LOOP AT lt_pv INTO DATA(ls_pv) WHERE path CP lv_base && '*/function/name'.
+      DATA(lv_item) = substring_before( val = ls_pv-path sub = `/function/name` ).
+      APPEND VALUE #( id        = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/id` )
+                      name      = ls_pv-value
+                      arguments = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/function/arguments` ) ) TO rt_.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD parse_calls_responses.
-    DATA(lv_arr) = zcl_pia_00_json_util=>extract_balanced(
-      iv_json = iv_body iv_key = 'output' iv_open = '[' iv_close = ']' ).
-    LOOP AT zcl_pia_00_json_util=>split_entries( lv_arr ) INTO DATA(lv_e).
-      IF lv_e NS '"function_call"' AND lv_e NS '"type":"function_call"'.
-        CONTINUE.
+    " output items of type function_call; the JSON is read by sXML (zcl_pia_00_json_util=>to_paths)
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = iv_body IMPORTING et_ = DATA(lt_pv) ).
+    LOOP AT lt_pv INTO DATA(ls_pv) WHERE path CP '/output/*/type' AND value = `function_call`.
+      DATA(lv_item) = substring_before( val = ls_pv-path sub = `/type` ).
+      IF lv_item CA `/` AND substring_after( val = lv_item sub = `/output/` ) CA `/`.
+        CONTINUE.   " a nested type, not an output item
       ENDIF.
-      DATA ls TYPE zif_pia_00_tool=>ts_call.
-      ls-id = zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'call_id' ).
-      ls-name = zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'name' ).
-      ls-arguments = zcl_pia_00_json_util=>unescape( zcl_pia_00_json_util=>extract_balanced(
-                       iv_json = lv_e iv_key = 'arguments' iv_open = '{' iv_close = '}' ) ).
-      IF ls-name IS NOT INITIAL.
-        APPEND ls TO rt_.
-      ENDIF.
+      APPEND VALUE #( id        = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/call_id` )
+                      name      = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/name` )
+                      arguments = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/arguments` ) ) TO rt_.
     ENDLOOP.
   ENDMETHOD.
 
@@ -103,22 +96,23 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
       IF ls-role = 'system'.
         CONTINUE. " goes to instructions
       ELSEIF ls-role = 'assistant' AND ls-content CP '{"tool_calls"*'.
-        DATA(lv_arr) = zcl_pia_00_json_util=>extract_balanced(
-          iv_json = ls-content iv_key = 'tool_calls' iv_open = '[' iv_close = ']' ).
-        LOOP AT zcl_pia_00_json_util=>split_entries( lv_arr ) INTO DATA(lv_e).
+        zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = ls-content IMPORTING et_ = DATA(lt_pv) ).
+        LOOP AT lt_pv INTO DATA(ls_pv) WHERE path CP '/tool_calls/*/name'.
+          DATA(lv_item) = substring_before( val = ls_pv-path sub = `/name` ).
           APPEND '{"type":"function_call","call_id":"' &&
-                 zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'id' ) &&
-                 '","name":"' &&
-                 zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'name' ) &&
+                 zcl_pia_00_json_util=>escape( zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/id` ) ) &&
+                 '","name":"' && zcl_pia_00_json_util=>escape( ls_pv-value ) &&
                  '","arguments":"' &&
-                 zcl_pia_00_json_util=>extract_str( iv_json = lv_e iv_name = 'arguments' ) &&
+                 zcl_pia_00_json_util=>escape( zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = lv_item && `/arguments` ) ) &&
                  '"}' TO lt.
         ENDLOOP.
       ELSEIF ls-role = 'tool'.
+        " stored as the members "tool_call_id":"..","content":".." (no braces)
+        zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = `{` && ls-content && `}` IMPORTING et_ = DATA(lt_tool) ).
         APPEND '{"type":"function_call_output","call_id":"' &&
-               zcl_pia_00_json_util=>extract_str( iv_json = ls-content iv_name = 'tool_call_id' ) &&
+               zcl_pia_00_json_util=>escape( zcl_pia_00_json_util=>path_value( it_ = lt_tool iv_path = `/tool_call_id` ) ) &&
                '","output":"' &&
-               zcl_pia_00_json_util=>extract_str( iv_json = ls-content iv_name = 'content' ) && '"}' TO lt.
+               zcl_pia_00_json_util=>escape( zcl_pia_00_json_util=>path_value( it_ = lt_tool iv_path = `/content` ) ) && '"}' TO lt.
       ELSE.
         APPEND '{"role":"' && ls-role && '","content":"' &&
                zcl_pia_00_json_util=>escape( ls-content ) && '"}' TO lt.
@@ -205,18 +199,15 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
     IF ms_config-api_type = 'responses'.
       et_calls = parse_calls_responses( lv_resp ).
       " answer: output_text of message items
-      DATA(lv_arr2) = zcl_pia_00_json_util=>extract_balanced(
-        iv_json = lv_resp iv_key = 'output' iv_open = '[' iv_close = ']' ).
-      LOOP AT zcl_pia_00_json_util=>split_entries( lv_arr2 ) INTO DATA(lv_item).
-        IF lv_item CS 'output_text'.
-          ev_answer = ev_answer && zcl_pia_00_json_util=>unescape(
-            zcl_pia_00_json_util=>extract_str( iv_json = lv_item iv_name = 'text' ) ).
-        ENDIF.
+      zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = lv_resp IMPORTING et_ = DATA(lt_out) ).
+      LOOP AT lt_out INTO DATA(ls_out) WHERE path CP '/output/*/content/*/type' AND value = `output_text`.
+        ev_answer = ev_answer && zcl_pia_00_json_util=>path_value(
+          it_ = lt_out iv_path = substring_before( val = ls_out-path sub = `/type` ) && `/text` ).
       ENDLOOP.
     ELSE.
       et_calls = parse_calls_chat( lv_resp ).
-      ev_answer = zcl_pia_00_json_util=>unescape(
-        zcl_pia_00_json_util=>extract_str( iv_json = lv_resp iv_name = 'content' ) ).
+      zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = lv_resp IMPORTING et_ = DATA(lt_chat) ).
+      ev_answer = zcl_pia_00_json_util=>path_value( it_ = lt_chat iv_path = `/choices/1/message/content` ).
     ENDIF.
 
     " replayable raw (uniform session convention)

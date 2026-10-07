@@ -43,8 +43,9 @@ CLASS zcl_pia_00_tool_base IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_arg.
-    rv_ = zcl_pia_00_json_util=>unescape(
-            zcl_pia_00_json_util=>extract_str( iv_json = iv_arguments iv_name = iv_name ) ).
+    " the model's arguments are read by sXML (to_paths): escapes and brackets inside strings are the reader's job
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = iv_arguments IMPORTING et_ = DATA(lt_pv) ).
+    rv_ = zcl_pia_00_json_util=>path_value( it_ = lt_pv iv_path = `/` && iv_name ).
   ENDMETHOD.
 
   METHOD ok.
