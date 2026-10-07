@@ -26,7 +26,8 @@ GREEN: 1 passed, 0 failed
 | | |
 |---|---|
 | **Terminal** | xterm.js over an ABAP Push Channel: live tool events (over AMC), a status line while the agent works, type-ahead with a queue, Up/Down history, copy on select, Ctrl+V, Ctrl+A |
-| **Agent loop** | `read_object` · `write_source` (main or `testclasses`) · `activate` · `run_tests`; up to 8 steps per turn; answers in the language you write in |
+| **Agent loop** | `outline` · `read_method` · `write_method` (one method, ranges from the system) · `read_object` · `write_source` (main or `testclasses`) · `activate` · `run_tests`; up to 8 steps per turn; `/auto` keeps going turn after turn; answers in the language you write in |
+| **Self-hosting** | LLM answers and tool arguments are read with sXML; a guard rolls back PIA's change to its own code when it can no longer read its tool calls |
 | **Sessions** | conversations survive reconnects and reloads and are shown again on resume (`/new` starts a fresh one) |
 | **SAP backend** | ADT REST on the same system via `cl_http_client=>create_internal` — your user, no password, local (`$…`) packages only |
 | **Turns off the push channel** | SAP forbids ABAP Unit and source writes inside an APC handler, so each turn runs as a background job `PIA_<session>` and streams back over AMC |
@@ -43,9 +44,9 @@ break `add` → tests red → fix → tests green, five turns per language, 15/1
 
 ## Install on SAP (7.58, tested on the ABAP Platform Trial A4H)
 
-1. **Import the package.** Download `pia-v0.1.2-abapgit.zip` from the release and import it with abapGit
+1. **Import the package.** Download `pia-v0.1.3-abapgit.zip` from the release and import it with abapGit
    (offline repository) into a new local package `$ZPIA`. With vsp:
-   `vsp git import-zip pia-v0.1.2-abapgit.zip --package '$ZPIA'`.
+   `vsp git import-zip pia-v0.1.3-abapgit.zip --package '$ZPIA'`.
 2. **Trust z.ai.** In STRUST add *USERTrust RSA Certification Authority* and *Sectigo Public Server
    Authentication Root R46* to *SSL client Anonymous* and *SSL client Standard*.
 3. **Give PIA a key.** Put a file `pia.env` into the instance's `DIR_HOME` (A4H: `/usr/sap/A4H/D00/work`),
