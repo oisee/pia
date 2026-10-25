@@ -15,10 +15,14 @@ CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS model
       RETURNING VALUE(rv_) TYPE string.
 
+    CLASS-METHODS llm_config
+      RETURNING VALUE(rs_) TYPE zif_pia_00_llm=>ts_config.
+
   PRIVATE SECTION.
     CLASS-METHODS get_from
       IMPORTING iv_file    TYPE string
                 iv_name    TYPE string
+                iv_missing TYPE string DEFAULT ``
       RETURNING VALUE(rv_) TYPE string.
 
     " value part of a NAME=value line (pure helper, for unit tests)
@@ -29,6 +33,28 @@ CLASS zcl_pia_00_config DEFINITION PUBLIC FINAL CREATE PUBLIC.
 ENDCLASS.
 
 CLASS zcl_pia_00_config IMPLEMENTATION.
+
+  METHOD llm_config.
+    rs_-base_url = get( `PIA_BASE_URL` ).
+    IF rs_-base_url IS INITIAL.
+      rs_-base_url = `https://api.z.ai/api/v1/responses`.
+    ENDIF.
+    rs_-api_type = get( `PIA_API_TYPE` ).
+    IF rs_-api_type IS INITIAL.
+      rs_-api_type = `responses`.
+    ENDIF.
+    rs_-model = model( ).
+    " Explicit empty PIA_API_KEY disables authentication, even when a legacy key exists.
+    rs_-api_key = get_from( iv_file = c_file iv_name = `PIA_API_KEY` iv_missing = `#PIA_UNSET#` ).
+    IF rs_-api_key = `#PIA_UNSET#`.
+      rs_-api_key = get_from( iv_file = c_settings iv_name = `PIA_API_KEY` iv_missing = `#PIA_UNSET#` ).
+    ENDIF.
+    IF rs_-api_key = `#PIA_UNSET#`.
+      rs_-api_key = get( `ZAI_API_KEY` ).
+    ENDIF.
+    rs_-temperature = get( `PIA_TEMPERATURE` ).
+    rs_-max_tokens = get( `PIA_MAX_TOKENS` ).
+  ENDMETHOD.
 
   METHOD model.
     rv_ = get( `PIA_MODEL` ).
@@ -45,6 +71,7 @@ CLASS zcl_pia_00_config IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_from.
+    rv_ = iv_missing.
     DATA lv_line TYPE string.
     DATA lv_key TYPE string.
     DATA lv_off TYPE i.
@@ -72,7 +99,7 @@ CLASS zcl_pia_00_config IMPLEMENTATION.
         ENDDO.
         CLOSE DATASET iv_file.
       CATCH cx_root.
-        CLEAR rv_.
+        rv_ = iv_missing.
     ENDTRY.
   ENDMETHOD.
 

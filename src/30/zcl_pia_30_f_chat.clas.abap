@@ -18,11 +18,7 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     mo_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = mo_registry io_backend = lo_backend ).
-    mo_llm = zcl_pia_00_llm_http=>new( VALUE #(
-      base_url = 'https://api.z.ai/api/v1/responses'
-      model    = zcl_pia_00_config=>model( )
-      api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
-      api_type = 'responses' ) ).
+    mo_llm = zcl_pia_00_llm_http=>new( zcl_pia_00_config=>llm_config( ) ).
     mo_session = zcl_pia_00_session=>new( 'chat' ).
   ENDMETHOD.
 
@@ -43,14 +39,17 @@ CLASS zcl_pia_30_f_chat IMPLEMENTATION.
     IF lv_method = 'POST' AND lv_msg IS NOT INITIAL.
       DATA(lo_exec) = zcl_pia_00_executor=>new(
         io_llm = mo_llm io_registry = mo_registry io_session = mo_session ).
-      lo_exec->run(
+      DATA(ls_result) = lo_exec->run(
         iv_task = lv_msg
-        iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai). If asked which model you are, say exactly that; never claim another model or vendor. |
+        iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) }. If asked which model you are, report this configured model name. |
                  && 'Tools: read_object(name), write_source(name, source - FULL source, include main|testclasses), activate(name), run_tests(name). '
                  && 'Rules: read before write; always activate after write; new code goes live NEXT step, so after activate finish the turn and run_tests in the next turn. '
                  && 'Answer briefly. ALWAYS answer in the language of the user message. If asked to just talk - talk.'
         iv_max_iterations = 8
         iv_continue = abap_true ).
+      IF ls_result-error IS NOT INITIAL.
+        mo_session->push_message( iv_role = `assistant` iv_content = ls_result-error ).
+      ENDIF.
     ENDIF.
     render( EXPORTING io_server = server IMPORTING ev_html = DATA(lv_html) ).
     server->response->set_header_field( name = 'content-type' value = 'text/html; charset=utf-8' ).

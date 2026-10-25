@@ -29,8 +29,8 @@ ENDCLASS.
 CLASS zcl_pia_30_turn IMPLEMENTATION.
 
   METHOD system_prompt.
-    rv_ = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai) |
-       && |through backend { iv_backend }. If asked which model you are, say exactly that; never claim another model or vendor. |
+    rv_ = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } |
+       && |through backend { iv_backend }. If asked which model you are, report this configured model name. |
        && `Tools: outline(name), read_method(name, method, class), write_method(name, method, source - one METHOD block, class), `
        && `read_object(name, include main|testclasses), write_source(name, source - FULL source, include), activate(name), run_tests(name). `
        && `Rules: prefer outline, read_method and write_method for changing existing methods; use write_source only for new methods, `
@@ -69,11 +69,7 @@ CLASS zcl_pia_30_turn IMPLEMENTATION.
         ENDIF.
         DATA(lo_registry) = zcl_pia_00_registry=>new( ).
         zcl_pia_15_toolset=>register_dev_tools( io_registry = lo_registry io_backend = lo_backend ).
-        DATA(lo_llm) = zcl_pia_00_llm_http=>new( VALUE #(
-          base_url = 'https://api.z.ai/api/v1/responses'
-          model    = zcl_pia_00_config=>model( )
-          api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
-          api_type = 'responses' ) ).
+        DATA(lo_llm) = zcl_pia_00_llm_http=>new( zcl_pia_00_config=>llm_config( ) ).
         DATA(lo_exec) = zcl_pia_00_executor=>new(
           io_llm      = lo_llm
           io_registry = lo_registry

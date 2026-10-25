@@ -4,6 +4,8 @@ INTERFACE zif_pia_00_llm PUBLIC.
            base_url TYPE string,
            model    TYPE string,
            api_key  TYPE string,
+           temperature TYPE string, " optional JSON number; initial means omitted
+           max_tokens TYPE string,  " optional positive integer
            api_type TYPE string, " 'chat' | 'responses'
          END OF ts_config.
 

@@ -22,11 +22,7 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
     DATA(lo_backend) = zcl_pia_20_backend=>default( ).
     go_registry = zcl_pia_00_registry=>new( ).
     zcl_pia_15_toolset=>register_dev_tools( io_registry = go_registry io_backend = lo_backend ).
-    go_llm = zcl_pia_00_llm_http=>new( VALUE #(
-      base_url = 'https://api.z.ai/api/v1/responses'
-      model    = zcl_pia_00_config=>model( )
-      api_key  = zcl_pia_00_config=>get( `ZAI_API_KEY` )
-      api_type = 'responses' ) ).
+    go_llm = zcl_pia_00_llm_http=>new( zcl_pia_00_config=>llm_config( ) ).
     go_session = zcl_pia_00_session=>new( 'a2a' ).
   ENDMETHOD.
 
@@ -92,7 +88,7 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
 
     DATA(ls_result) = lo_exec->run(
       iv_task = lv_task
-      iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) } (z.ai). If asked which model you are, say exactly that; never claim another model or vendor. |
+      iv_system = |You are PIA (Pi-ABAP Agent), written in ABAP, running on the model { zcl_pia_00_config=>model( ) }. If asked which model you are, report this configured model name. |
                  && 'Tools: read_object, write_source, activate, run_tests. '
                && 'Read before write. Write FULL source. Activate after write. Answer briefly.'
       iv_max_iterations = 8
@@ -101,7 +97,11 @@ CLASS zcl_pia_30_f_a2a IMPLEMENTATION.
     " A2A response: JSON with answer + tool trace
     DATA lt TYPE string_table.
     APPEND '{"id":"' && |a2a_{ sy-uzeit }| && '",' TO lt.
-    APPEND '"status":{"state":"completed"},' TO lt.
+    DATA(lv_state) = COND string( WHEN ls_result-error IS INITIAL THEN `completed` ELSE `failed` ).
+    APPEND '"status":{"state":"' && lv_state && '"},' TO lt.
+    IF ls_result-error IS NOT INITIAL.
+      APPEND '"error":"' && zcl_pia_00_json_util=>escape( ls_result-error ) && '",' TO lt.
+    ENDIF.
     APPEND '"answer":"' && zcl_pia_00_json_util=>escape( ls_result-answer ) && '",' TO lt.
     APPEND '"tool_calls":' && |{ ls_result-tool_calls }| && ',' TO lt.
     APPEND '"iterations":' && |{ ls_result-iterations }| && ',' TO lt.
