@@ -17,7 +17,18 @@ CLASS zcl_pia_00_llm_http DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_body     TYPE string
       RETURNING VALUE(rt_)  TYPE zif_pia_00_tool=>tt_calls.
 
+    CLASS-METHODS parse_reply_chat
+      IMPORTING iv_body TYPE string
+      EXPORTING et_calls TYPE zif_pia_00_tool=>tt_calls
+                ev_answer TYPE string
+                ev_error TYPE string.
+
   PRIVATE SECTION.
+    METHODS build_request
+      IMPORTING it_messages TYPE zif_pia_00_llm=>tt_messages
+                iv_tools_json TYPE string OPTIONAL
+      RETURNING VALUE(lv_body) TYPE string.
+
     " next recorded response; the position is kept in <file>.pos so it survives turns run as jobs
     METHODS replay
       IMPORTING iv_file   TYPE string
@@ -121,17 +132,14 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
     rv_ = '[' && concat_lines_of( table = lt sep = ',' ) && ']'.
   ENDMETHOD.
 
-  METHOD zif_pia_00_llm~chat.
-    DATA lv_body TYPE string.
-    DATA li TYPE REF TO if_http_client.
-
+  METHOD build_request.
     IF ms_config-api_type = 'responses'.
       DATA lv_system TYPE string.
       READ TABLE it_messages INTO DATA(ls_sys) INDEX 1.
       IF sy-subrc = 0 AND ls_sys-role = 'system'.
         lv_system = ls_sys-content.
       ENDIF.
-      lv_body = '{"model":"' && ms_config-model &&
+      lv_body = '{"model":"' && zcl_pia_00_json_util=>escape( ms_config-model ) &&
                 '","instructions":"' && zcl_pia_00_json_util=>escape( lv_system ) &&
                 '","input":' && build_input_items( it_messages = it_messages iv_system = lv_system ).
       IF iv_tools_json IS NOT INITIAL.
@@ -146,7 +154,19 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
       DATA lt TYPE string_table.
       LOOP AT it_messages INTO DATA(ls).
         IF ls-role = 'assistant' AND ls-content CP '{"tool_calls"*'.
-          APPEND '{"role":"assistant","tool_calls":' && ls-content+14 && '}' TO lt.
+          zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = ls-content IMPORTING et_ = DATA(lt_calls) ).
+          DATA lt_wire TYPE string_table.
+          CLEAR lt_wire.
+          LOOP AT lt_calls INTO DATA(ls_call) WHERE path CP '/tool_calls/*/name'.
+            DATA(lv_item) = substring_before( val = ls_call-path sub = `/name` ).
+            APPEND `{"id":"` && zcl_pia_00_json_util=>escape(
+              zcl_pia_00_json_util=>path_value( it_ = lt_calls iv_path = lv_item && `/id` ) )
+              && `","type":"function","function":{"name":"` && zcl_pia_00_json_util=>escape( ls_call-value )
+              && `","arguments":"` && zcl_pia_00_json_util=>escape(
+              zcl_pia_00_json_util=>path_value( it_ = lt_calls iv_path = lv_item && `/arguments` ) ) && `"}}` TO lt_wire.
+          ENDLOOP.
+          APPEND `{"role":"assistant","content":null,"tool_calls":[`
+            && concat_lines_of( table = lt_wire sep = `,` ) && `]}` TO lt.
         ELSEIF ls-role = 'tool'.
           APPEND '{"role":"tool",' && ls-content && '}' TO lt.
         ELSE.
@@ -154,9 +174,50 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
                  zcl_pia_00_json_util=>escape( ls-content ) && '"}' TO lt.
         ENDIF.
       ENDLOOP.
-      lv_body = '{"model":"' && ms_config-model && '","stream":false,"messages":[' &&
+      lv_body = '{"model":"' && zcl_pia_00_json_util=>escape( ms_config-model ) && '","stream":false,"messages":[' &&
                 concat_lines_of( table = lt sep = ',' ) && ']' && lv_tools && '}'.
     ENDIF.
+
+    " Only configured sampling limits go on the wire. Preserve API defaults otherwise.
+    DATA lv_options TYPE string.
+    IF ms_config-temperature IS NOT INITIAL.
+      FIND REGEX `^-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?$` IN ms_config-temperature.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE cx_sy_conversion_no_number.
+      ENDIF.
+      lv_options = lv_options && `,"temperature":` && ms_config-temperature.
+    ENDIF.
+    IF ms_config-max_tokens IS NOT INITIAL.
+      FIND REGEX `^[1-9][0-9]*$` IN ms_config-max_tokens.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE cx_sy_conversion_no_number.
+      ENDIF.
+      DATA(lv_limit) = COND string( WHEN ms_config-api_type = `responses` THEN `max_output_tokens` ELSE `max_tokens` ).
+      lv_options = lv_options && `,"` && lv_limit && `":` && ms_config-max_tokens.
+    ENDIF.
+    IF lv_options IS NOT INITIAL.
+      lv_body = substring( val = lv_body len = strlen( lv_body ) - 1 ) && lv_options && `}`.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD parse_reply_chat.
+    CLEAR: et_calls, ev_answer, ev_error.
+    et_calls = parse_calls_chat( iv_body ).
+    zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = iv_body IMPORTING et_ = DATA(lt_chat) ).
+    ev_answer = zcl_pia_00_json_util=>path_value( it_ = lt_chat iv_path = `/choices/1/message/content` ).
+    " reasoning_content is deliberately ignored; this adapter has no metrics sink.
+    IF zcl_pia_00_json_util=>path_value( it_ = lt_chat iv_path = `/choices/1/finish_reason` ) = `length`.
+      ev_error = `LLM output truncated (finish_reason=length); increase PIA_MAX_TOKENS or reduce the context.`.
+      CLEAR et_calls. " never execute incomplete tool arguments
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD zif_pia_00_llm~chat.
+    CLEAR: et_calls, ev_answer, ev_assistant_raw, ev_body, ev_status, ev_error.
+    DATA lv_body TYPE string.
+    DATA li TYPE REF TO if_http_client.
+
+    lv_body = build_request( it_messages = it_messages iv_tools_json = iv_tools_json ).
 
     " PIA_LLM=replay:<file> answers from a recorded transcript (no key, no network);
     " PIA_LLM=record:<file> appends every response body to that file (one escaped body per line)
@@ -205,9 +266,11 @@ CLASS zcl_pia_00_llm_http IMPLEMENTATION.
           it_ = lt_out iv_path = substring_before( val = ls_out-path sub = `/type` ) && `/text` ).
       ENDLOOP.
     ELSE.
-      et_calls = parse_calls_chat( lv_resp ).
-      zcl_pia_00_json_util=>to_paths( EXPORTING iv_json = lv_resp IMPORTING et_ = DATA(lt_chat) ).
-      ev_answer = zcl_pia_00_json_util=>path_value( it_ = lt_chat iv_path = `/choices/1/message/content` ).
+      parse_reply_chat( EXPORTING iv_body = lv_resp
+                        IMPORTING et_calls = et_calls ev_answer = ev_answer ev_error = ev_error ).
+      IF ev_error IS NOT INITIAL.
+        RETURN.
+      ENDIF.
     ENDIF.
 
     " replayable raw (uniform session convention)

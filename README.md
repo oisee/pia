@@ -66,6 +66,32 @@ break `add` → tests red → fix → tests green, five turns per language, 15/1
 PIA keeps its conversations as `pia-session-<id>.txt` next to `pia.env`. Settings without secrets can go into
 `pia-settings.env` in the same directory.
 
+### Local model
+
+To use an OpenAI-compatible llama.cpp server with tool support, put these settings in
+`pia-settings.env` beside `pia.env` (use the model name served by your server):
+
+```ini
+PIA_BASE_URL=http://127.0.0.1:8089/v1/chat/completions
+PIA_API_TYPE=chat
+PIA_MODEL=local-model
+PIA_API_KEY=
+PIA_TEMPERATURE=0.2
+PIA_MAX_TOKENS=4096
+```
+
+`PIA_BASE_URL` is the full endpoint URL. `PIA_API_TYPE` accepts `chat` or `responses`.
+Absent settings preserve the default z.ai Responses endpoint, `glm-5.3`, and `ZAI_API_KEY`.
+`PIA_API_KEY` overrides the legacy key; an explicitly empty value sends no Authorization header.
+Values in `pia.env` take precedence over `pia-settings.env` (including an empty `PIA_API_KEY`).
+Temperature and token limits are optional JSON numbers; omit them to keep server defaults.
+Tokens use `max_tokens` for chat and `max_output_tokens` for Responses. A chat `length` finish
+reason reports truncation and does not execute potentially incomplete tool calls.
+`reasoning_content` is ignored; PIA has no reasoning metrics sink.
+
+For an isolated open-steamgate run, set `PIA_DATA_DIR` to a settings directory when invoking
+`osg-probe/osg-setup.sh`; otherwise it uses the existing default settings directory.
+
 ### Record and replay
 
 `PIA_LLM=record:<file>` in `pia-settings.env` appends every LLM response to `<file>`; `PIA_LLM=replay:<file>`
